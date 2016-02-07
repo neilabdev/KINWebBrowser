@@ -155,7 +155,9 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     [super viewWillAppear:animated];
     
     [self.navigationController setNavigationBarHidden:NO animated:YES];
-    [self.navigationController setToolbarHidden:NO animated:YES];
+
+    if(!self.hidesBottomBarWhenPushed)
+        [self.navigationController setToolbarHidden:NO animated:YES];
     
     [self.navigationController.navigationBar addSubview:self.progressView];
     
