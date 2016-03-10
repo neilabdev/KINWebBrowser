@@ -41,16 +41,45 @@
  
  */
 @interface UINavigationController(KINWebBrowser)
-
 // Returns rootViewController casted as KINWebBrowserViewController
 - (KINWebBrowserViewController *)rootWebBrowser;
-
 @end
 
 
+@protocol  KINWebBrowserView <NSObject>
+@property(nonatomic, readonly, copy, nullable) NSString *title;
+@property(nonatomic, readonly, copy, nullable) NSURL *URL;
+@property(nonatomic, readonly, strong, nonnull) UIScrollView *scrollView;
+@property(nonatomic, readonly, getter=isLoading) BOOL loading;
+- (void) evaluateJavaScript: (NSString *) script then: (void (^ __nullable)(__nullable id, NSError * __nullable error))then;
+- (void)loadURLRequest:(NSURLRequest * _Nonnull)request;
+
+@end
+
+@interface UIWebView (KINWebBrowserWebViewMethods)
+@property(nonatomic, readonly, copy, nullable) NSURL *URL;
+@property(nonatomic, readonly, getter=isLoading) BOOL loading;
+@property(nonatomic, readonly, copy, nullable) NSString *title;
+- (void) evaluateJavaScript: (NSString *) script then: (void (^ __nullable)(__nullable id, NSError * __nullable error))then;
+@end
+
+@interface WKWebView (KINWebBrowserWebViewMethods)
+- (void) evaluateJavaScript: (NSString *) script then: (void (^ __nullable)(__nullable id, NSError * __nullable error))then;
+@end
+
+enum {
+    KINBrowserNavigationTypeLinkClicked,
+    KINBrowserNavigationTypeFormSubmitted,
+    KINBrowserNavigationTypeBackForward,
+    KINBrowserNavigationTypeReload,
+    KINBrowserNavigationTypeFormResubmitted,
+    KINBrowserNavigationTypeOther
+};
+typedef NSUInteger KINBrowserNavigationType;
 
 @protocol KINWebBrowserDelegate <NSObject>
 @optional
+- (BOOL)webBrowser:(KINWebBrowserViewController *)webBrowser shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(KINBrowserNavigationType)navigationType;
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didStartLoadingURL:(NSURL *)URL;
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFinishLoadingURL:(NSURL *)URL;
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFailToLoadURL:(NSURL *)URL error:(NSError *)error;
@@ -77,6 +106,8 @@
 // Depending on the version of iOS, one of these will be set
 @property (nonatomic, strong) WKWebView *wkWebView;
 @property (nonatomic, strong) UIWebView *uiWebView;
+@property (nonatomic, readonly) id <KINWebBrowserView> webView;
+@property (nonatomic,strong) Class browserViewClass;
 
 - (id)initWithConfiguration:(WKWebViewConfiguration *)configuration NS_AVAILABLE_IOS(8_0);
 
@@ -104,7 +135,6 @@
 + (UINavigationController *)navigationControllerWithWebBrowser;
 + (UINavigationController *)navigationControllerWithWebBrowserWithConfiguration:(WKWebViewConfiguration *)configuration NS_AVAILABLE_IOS(8_0);
 
-
 @property (nonatomic, strong) UIBarButtonItem *actionButton;
 @property (nonatomic, strong) UIColor *tintColor;
 @property (nonatomic, strong) UIColor *barTintColor;
@@ -116,8 +146,6 @@
 @property (nonatomic, strong) NSArray *customActivityItems;
 
 #pragma mark - Public Interface
-
-
 // Load a NSURLURLRequest to web view
 // Can be called any time after initialization
 - (void)loadRequest:(NSURLRequest *)request;
@@ -134,6 +162,5 @@
 // Loads an string containing HTML to web view
 // Can be called any time after initialization
 - (void)loadHTMLString:(NSString *)HTMLString;
-
 @end
 

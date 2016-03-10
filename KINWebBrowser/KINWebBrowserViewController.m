@@ -35,6 +35,55 @@
 #import "TUSafariActivity.h"
 #import "ARChromeActivity.h"
 
+
+
+@implementation UIWebView (KINWebBrowserWebViewMethods)
+- (NSURL *)URL {
+    return self.request.URL;
+}
+
+- (void)loadURLRequest:(NSURLRequest * _Nonnull)request {
+    [self loadRequest:request];
+}
+
+- (void)evaluateJavaScript:(NSString *)script then:(void (^ __nullable)(__nullable id, NSError *__nullable error))then {
+    __block NSString *value = nil;
+    __block NSError *error = nil;
+
+    if([NSThread isMainThread]) {
+        value = [self stringByEvaluatingJavaScriptFromString:script];
+        error = value ? nil : [NSError errorWithDomain:@"venttastic" code:1776 userInfo:@{script : script}];
+    } else dispatch_sync(dispatch_get_main_queue(), ^{
+            value = [self stringByEvaluatingJavaScriptFromString:script];
+            error = value ? nil : [NSError errorWithDomain:@"venttastic" code:1776 userInfo:@{script : script}];
+        });
+
+    if(then)
+        then(value, error);
+}
+
+- (NSString *)title {
+    __block NSString* value = nil;//[self stringByEvaluatingJavaScriptFromString:@"document.title"];
+    [self evaluateJavaScript:@"document.title" then:^(id o, NSError *error) {
+        value = o;
+    }];
+
+    return value;
+}
+@end
+
+@implementation WKWebView (KINWebBrowserWebViewMethods)
+- (void) evaluateJavaScript: (NSString *) script then: (void (^ __nullable)(__nullable id, NSError * __nullable error))then {
+    [self evaluateJavaScript:script completionHandler:then];
+}
+
+- (void)loadURLRequest:(NSURLRequest * _Nonnull)request {
+    [self loadRequest:request];
+}
+@end
+
+
+
 static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 @interface KINWebBrowserViewController () <UIAlertViewDelegate>
@@ -47,12 +96,19 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 @property (nonatomic, strong) NSURL *uiWebViewCurrentURL;
 @property (nonatomic, strong) NSURL *URLToLaunchWithPermission;
 @property (nonatomic, strong) UIAlertView *externalAppPermissionAlertView;
-
+@property (nonatomic, strong) WKWebViewConfiguration *configuration;
+@property (nonatomic, strong) NSMutableDictionary *requestBalance;
 @end
 
-@implementation KINWebBrowserViewController
+
+@implementation KINWebBrowserViewController {}
 
 #pragma mark - Static Initializers
+
+- (id <KINWebBrowserView>)webView {
+    id <KINWebBrowserView>  webView = ( self.wkWebView ? self.wkWebView : self.uiWebView);
+    return webView;
+}
 
 + (KINWebBrowserViewController *)webBrowser {
     KINWebBrowserViewController *webBrowserViewController = [KINWebBrowserViewController webBrowserWithConfiguration:nil];
@@ -88,27 +144,22 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     return [self initWithConfiguration:nil];
 }
 
+- (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
+    return [self initWithConfiguration:nil];
+}
+
+
 - (id)initWithConfiguration:(WKWebViewConfiguration *)configuration {
-    self = [super init];
+    self = [super initWithNibName:nil bundle:nil];
     if(self) {
-        if([WKWebView class]) {
-            if(configuration) {
-                self.wkWebView = [[WKWebView alloc] initWithFrame:CGRectZero configuration:configuration];
-            }
-            else {
-                self.wkWebView = [[WKWebView alloc] init];
-            }
-        }
-        else {
-            self.uiWebView = [[UIWebView alloc] init];
-        }
-        
+        self.requestBalance = [NSMutableDictionary dictionary];
+        self.configuration = configuration;
         self.actionButtonHidden = NO;
         self.showsURLInNavigationBar = NO;
         self.showsPageTitleInNavigationBar = YES;
-        
-        self.externalAppPermissionAlertView = [[UIAlertView alloc] initWithTitle:@"Leave this app?" message:@"This web page is trying to open an outside app. Are you sure you want to open it?" delegate:self cancelButtonTitle:@"Cancel" otherButtonTitles:@"Open App", nil];
-        
+        self.externalAppPermissionAlertView = [[UIAlertView alloc] initWithTitle:@"Leave this app?"
+                                                                         message:@"This web page is trying to open an outside app. Are you sure you want to open it?"
+                                                                        delegate:self cancelButtonTitle:@"Cancel" otherButtonTitles:@"Open App", nil];
     }
     return self;
 }
@@ -120,7 +171,21 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     
     self.previousNavigationControllerToolbarHidden = self.navigationController.toolbarHidden;
     self.previousNavigationControllerNavigationBarHidden = self.navigationController.navigationBarHidden;
-    
+
+    if((self.browserViewClass &&
+                self.browserViewClass == [WKWebView class])  ||  (!self.browserViewClass && [WKWebView class])) {
+        if(self.configuration) {
+            self.wkWebView = [[WKWebView alloc] initWithFrame:CGRectZero configuration:self.configuration];
+        }else {
+            self.wkWebView = [[WKWebView alloc] init];
+        }
+    } else {
+        self.uiWebView = [[UIWebView alloc] init];
+    }
+
+
+
+
     if(self.wkWebView) {
         [self.wkWebView setFrame:self.view.bounds];
         [self.wkWebView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
@@ -130,10 +195,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         [self.wkWebView setAutoresizesSubviews:YES];
         [self.wkWebView.scrollView setAlwaysBounceVertical:YES];
         [self.view addSubview:self.wkWebView];
-        
         [self.wkWebView addObserver:self forKeyPath:NSStringFromSelector(@selector(estimatedProgress)) options:0 context:KINWebBrowserContext];
-    }
-    else if(self.uiWebView) {
+    } else if(self.uiWebView) {
         [self.uiWebView setFrame:self.view.bounds];
         [self.uiWebView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
         [self.uiWebView setDelegate:self];
@@ -166,11 +229,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
-    
     [self.navigationController setNavigationBarHidden:self.previousNavigationControllerNavigationBarHidden animated:animated];
-    
     [self.navigationController setToolbarHidden:self.previousNavigationControllerToolbarHidden animated:animated];
-    
     [self.uiWebView setDelegate:nil];
     [self.progressView removeFromSuperview];
 }
@@ -178,6 +238,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 #pragma mark - Public Interface
 
 - (void)loadRequest:(NSURLRequest *)request {
+
     if(self.wkWebView) {
         [self.wkWebView loadRequest:request];
     }
@@ -227,37 +288,66 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 - (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
     if(webView == self.uiWebView) {
-        
-        if(![self externalAppRequiredToOpenURL:request.URL]) {
+
+        if([self.delegate respondsToSelector:@selector(webBrowser:shouldStartLoadWithRequest:navigationType:)]) {
+            KINBrowserNavigationType browserNavigationType ;
+
+            switch(navigationType) {
+                case UIWebViewNavigationTypeLinkClicked:
+                    browserNavigationType = KINBrowserNavigationTypeLinkClicked; break;
+                case UIWebViewNavigationTypeFormSubmitted:
+                    browserNavigationType = KINBrowserNavigationTypeFormSubmitted; break;
+                case UIWebViewNavigationTypeBackForward:
+                    browserNavigationType = KINBrowserNavigationTypeBackForward; break;
+                case UIWebViewNavigationTypeReload:
+                    browserNavigationType = KINBrowserNavigationTypeReload; break;
+                case UIWebViewNavigationTypeFormResubmitted:
+                    browserNavigationType = KINBrowserNavigationTypeFormResubmitted; break;
+                case UIWebViewNavigationTypeOther:
+                    browserNavigationType = KINBrowserNavigationTypeOther; break;
+                default:
+                    browserNavigationType = KINBrowserNavigationTypeOther; break;
+            }
+
+           if(![self.delegate webBrowser:self shouldStartLoadWithRequest:request navigationType:browserNavigationType])
+               return NO;
+        }
+//- (BOOL)webBrowser:(KINWebBrowserViewController *)webBrowser shouldLoadExternalRequest:(NSURLRequest *)request navigationType:(KINBrowserNavigationType)navigationType;
+    //    if(![self externalAppRequiredToOpenURL:request.URL]) {
             self.uiWebViewCurrentURL = request.URL;
             self.uiWebViewIsLoading = YES;
             [self updateToolbarState];
-            
             [self fakeProgressViewStartLoading];
             
             if([self.delegate respondsToSelector:@selector(webBrowser:didStartLoadingURL:)]) {
                 [self.delegate webBrowser:self didStartLoadingURL:request.URL];
             }
             return YES;
-        }
-        else {
+      /*  } else {
             [self launchExternalAppWithURL:request.URL];
             return NO;
-        }
+        } */
     }
     return NO;
 }
 
+- (void)webViewDidStartLoad:(UIWebView * _Nonnull)webView {
+    if(webView == self.uiWebView) {
+
+        if([self.delegate respondsToSelector:@selector(webBrowser:didStartLoadingURL:)]) {
+            [self.delegate webBrowser:self didStartLoadingURL:webView.request.URL];
+        }
+    }
+}
 - (void)webViewDidFinishLoad:(UIWebView *)webView {
     if(webView == self.uiWebView) {
         if(!self.uiWebView.isLoading) {
             self.uiWebViewIsLoading = NO;
             [self updateToolbarState];
-            
             [self fakeProgressBarStopLoading];
         }
-        
-        if([self.delegate respondsToSelector:@selector(webBrowser:didFinishLoadingURL:)]) {
+        if(   !webView.isLoading
+        &&  [self.delegate respondsToSelector:@selector(webBrowser:didFinishLoadingURL:)]) {
             [self.delegate webBrowser:self didFinishLoadingURL:self.uiWebView.request.URL];
         }
     }
@@ -282,6 +372,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation {
     if(webView == self.wkWebView) {
         [self updateToolbarState];
+
         if([self.delegate respondsToSelector:@selector(webBrowser:didStartLoadingURL:)]) {
             [self.delegate webBrowser:self didStartLoadingURL:self.wkWebView.URL];
         }
@@ -291,6 +382,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
     if(webView == self.wkWebView) {
         [self updateToolbarState];
+
         if([self.delegate respondsToSelector:@selector(webBrowser:didFinishLoadingURL:)]) {
             [self.delegate webBrowser:self didFinishLoadingURL:self.wkWebView.URL];
         }
@@ -300,6 +392,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation
       withError:(NSError *)error {
     if(webView == self.wkWebView) {
+
         [self updateToolbarState];
         if([self.delegate respondsToSelector:@selector(webBrowser:didFailToLoadURL:error:)]) {
             [self.delegate webBrowser:self didFailToLoadURL:self.wkWebView.URL error:error];
@@ -319,7 +412,33 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 - (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
     if(webView == self.wkWebView) {
-        
+
+        if([self.delegate respondsToSelector:@selector(webBrowser:shouldStartLoadWithRequest:navigationType:)]) {
+            KINBrowserNavigationType browserNavigationType = KINBrowserNavigationTypeOther;
+            switch(navigationAction.navigationType) {
+                case WKNavigationTypeLinkActivated:
+                    browserNavigationType = KINBrowserNavigationTypeLinkClicked; break;
+                case WKNavigationTypeFormSubmitted:
+                    browserNavigationType = KINBrowserNavigationTypeFormSubmitted; break;
+                case WKNavigationTypeBackForward:
+                    browserNavigationType = KINBrowserNavigationTypeBackForward; break;
+                case WKNavigationTypeReload:
+                    browserNavigationType = KINBrowserNavigationTypeReload; break;
+                case WKNavigationTypeFormResubmitted:
+                    browserNavigationType = KINBrowserNavigationTypeFormResubmitted; break;
+                case WKNavigationTypeOther:
+                    browserNavigationType = KINBrowserNavigationTypeOther; break;
+                default:
+                    browserNavigationType = KINBrowserNavigationTypeOther; break;
+            }
+
+            if(![self.delegate webBrowser:self  shouldStartLoadWithRequest: navigationAction.request
+                           navigationType:browserNavigationType]) {
+                decisionHandler(WKNavigationActionPolicyCancel);
+                return;
+            }
+        }
+/*
         NSURL *URL = navigationAction.request.URL;
         if(![self externalAppRequiredToOpenURL:URL]) {
             if(!navigationAction.targetFrame) {
@@ -332,7 +451,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
             [self launchExternalAppWithURL:URL];
             decisionHandler(WKNavigationActionPolicyCancel);
             return;
-        }
+        } */
     }
     decisionHandler(WKNavigationActionPolicyAllow);
 }
@@ -402,8 +521,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     
     self.tintColor = self.tintColor;
     self.barTintColor = self.barTintColor;
-    
-    
 }
 
 - (void)setupToolbarItems {
@@ -571,10 +688,25 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     }
 }
 
+#pragma mark - Balance Manipulation
+
+- (NSInteger) incrementURL: (NSURL*) url balanceBy: (NSInteger) amount {
+    NSNumber *number = self.requestBalance[url.absoluteString];
+    NSInteger updatedNumber =  (number ? [number integerValue] : 0) + amount;
+
+    if(updatedNumber < 1) {
+        self.requestBalance[url.absoluteString] = nil;
+    } else {
+        self.requestBalance[url.absoluteString] = @(updatedNumber);
+    }
+
+    return updatedNumber;
+}
+
 #pragma mark - External App Support
 
 - (BOOL)externalAppRequiredToOpenURL:(NSURL *)URL {
-    NSSet *validSchemes = [NSSet setWithArray:@[@"http", @"https"]];
+    NSSet *validSchemes = [NSSet setWithArray:@[@"http", @"https",@"about"]];
     return ![validSchemes containsObject:URL.scheme];
 }
 
@@ -620,7 +752,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 - (void)dealloc {
     [self.uiWebView setDelegate:nil];
-    
     [self.wkWebView setNavigationDelegate:nil];
     [self.wkWebView setUIDelegate:nil];
     if ([self isViewLoaded]) {
