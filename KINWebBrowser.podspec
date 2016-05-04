@@ -15,6 +15,11 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/dfmuir/KINWebBrowser.git", :tag => s.version.to_s }
   s.source_files  = 'KINWebBrowser', 'KINWebBrowser/**/*.{h,m}'
   s.resources = "Assets/*.png"
+  s.resource_bundles = {
+    'KINWebBrowser' => ['Assets/*.png']
+  }
+  s.module_map="KINWebBrowser/KINWebBrowser.modulemap"
+
   s.requires_arc = true
 
   s.weak_framework = 'WebKit'

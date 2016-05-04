@@ -32,8 +32,9 @@
 
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
-
+#import "KINWebBrowserAddressBar.h"
 @class KINWebBrowserViewController;
+
 
 /*
  
@@ -41,20 +42,56 @@
  
  */
 @interface UINavigationController(KINWebBrowser)
-
 // Returns rootViewController casted as KINWebBrowserViewController
 - (KINWebBrowserViewController *)rootWebBrowser;
+@end
 
+
+@protocol  KINWebBrowserView <NSObject>
+@property(nonatomic, readonly, copy, nullable) NSString *title;
+@property(nonatomic, readonly, copy, nullable) NSURL *URL;
+@property(nonatomic, readonly, strong, nonnull) UIScrollView *scrollView;
+@property(nonatomic, readonly) BOOL canGoForward;
+@property(nonatomic, readonly) BOOL canGoBack;
+@property(nonatomic, readonly, getter=isLoading) BOOL loading;
+- (void) evaluateJavaScript: (NSString *) script then: (void (^ __nullable)(__nullable id, NSError * __nullable error))then;
+- (void)loadURLRequest:(NSURLRequest * _Nonnull)request;
+- (void)stopLoading;
+- (void)refresh;
+@end
+
+@interface UIWebView (KINWebBrowserWebViewMethods)
+@property(nonatomic, readonly, copy, nullable) NSURL *URL;
+@property(nonatomic, readonly, getter=isLoading) BOOL loading;
+@property(nonatomic, readonly, copy, nullable) NSString *title;
+- (void)evaluateJavaScript: (NSString *) script then: (void (^ __nullable)(__nullable id, NSError * __nullable error))then;
+- (void)refresh;
+@end
+
+@interface WKWebView (KINWebBrowserWebViewMethods)
+- (void) evaluateJavaScript: (NSString *) script then: (void (^ __nullable)(__nullable id, NSError * __nullable error))then;
+- (void)refresh;
 @end
 
 
 
+typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
+    KINBrowserNavigationTypeLinkClicked,
+    KINBrowserNavigationTypeFormSubmitted,
+    KINBrowserNavigationTypeBackForward,
+    KINBrowserNavigationTypeReload,
+    KINBrowserNavigationTypeFormResubmitted,
+    KINBrowserNavigationTypeOther
+};
+
 @protocol KINWebBrowserDelegate <NSObject>
 @optional
+- (BOOL)webBrowser:(KINWebBrowserViewController *)webBrowser shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(KINBrowserNavigationType)navigationType;
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didStartLoadingURL:(NSURL *)URL;
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFinishLoadingURL:(NSURL *)URL;
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFailToLoadURL:(NSURL *)URL error:(NSError *)error;
 - (void)webBrowserViewControllerWillDismiss:(KINWebBrowserViewController*)viewController;
+- (NSArray*) webBrowserToolbarItems;
 @end
 
 
@@ -69,15 +106,20 @@
 #pragma mark - Public Properties
 
 @property (nonatomic, weak) id <KINWebBrowserDelegate> delegate;
-
 // The main and only UIProgressView
 @property (nonatomic, strong) UIProgressView *progressView;
 
 // The web views
 // Depending on the version of iOS, one of these will be set
+@property(nonatomic, strong) UIBarButtonItem *browserBackButtonItem, *browserForwardButtonItem, *browserRefreshButtonItem, *browserStopButtonItem, *browserFixedSeparator, *browserFlexibleSeparator;
 @property (nonatomic, strong) WKWebView *wkWebView;
 @property (nonatomic, strong) UIWebView *uiWebView;
-
+@property (nonatomic, readonly) UIView <KINWebBrowserView> *webView;
+@property (nonatomic,strong) UIView *browserHeaderView;
+@property (nonatomic,strong) id <KINWebBrowserAddressBarAbility> addressBar; //todo: perhaps this should be weak?
+@property (nonatomic,strong) Class browserViewClass;
+@property(nonatomic, readonly, copy, nullable) NSURL *URL;
+@property(nonatomic, readonly, getter=isLoading) BOOL loading;
 - (id)initWithConfiguration:(WKWebViewConfiguration *)configuration NS_AVAILABLE_IOS(8_0);
 
 #pragma mark - Static Initializers
@@ -104,7 +146,6 @@
 + (UINavigationController *)navigationControllerWithWebBrowser;
 + (UINavigationController *)navigationControllerWithWebBrowserWithConfiguration:(WKWebViewConfiguration *)configuration NS_AVAILABLE_IOS(8_0);
 
-
 @property (nonatomic, strong) UIBarButtonItem *actionButton;
 @property (nonatomic, strong) UIColor *tintColor;
 @property (nonatomic, strong) UIColor *barTintColor;
@@ -115,9 +156,9 @@
 //Allow for custom activities in the browser by populating this optional array
 @property (nonatomic, strong) NSArray *customActivityItems;
 
+//@property(nonatomic, strong, readonly, getter=backButton) UIBarButtonItem *backButtonItem;
+//@property(nonatomic, strong, readonly, getter=forwardButton) UIBarButtonItem *forwardButtonItem;
 #pragma mark - Public Interface
-
-
 // Load a NSURLURLRequest to web view
 // Can be called any time after initialization
 - (void)loadRequest:(NSURLRequest *)request;
@@ -130,10 +171,13 @@
 // Can be called any time after initialization
 - (void)loadURLString:(NSString *)URLString;
 
-
 // Loads an string containing HTML to web view
 // Can be called any time after initialization
 - (void)loadHTMLString:(NSString *)HTMLString;
 
+- (void)reload;
+- (void)stopLoading;
+- (void)goForward;
+- (void)goBack;
 @end
 
