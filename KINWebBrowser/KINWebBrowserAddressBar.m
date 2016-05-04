@@ -61,6 +61,7 @@ typedef NS_ENUM(NSInteger, KINAddressBarState) {
         addressField.textAlignment = NSTextAlignmentCenter;
         addressField.delegate = self;
         addressField.autocorrectionType = UITextAutocorrectionTypeNo;
+        addressField.autocapitalizationType = UITextAutocapitalizationTypeNone;
         actionState = KINAddressBarStateIntitial;
         self.refreshActionImage = [self loadBundleImageName:@"reloadbutton"];
         self.cancelActionImage = [self loadBundleImageName:@"cancelbutton"];
@@ -270,7 +271,7 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
 }
 
 
-#pragma mark - „
+#pragma mark -
 
 - (void)textFieldDidEndEditing:(UITextField *)textField {
     return;
