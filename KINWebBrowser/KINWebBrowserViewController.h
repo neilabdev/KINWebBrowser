@@ -91,6 +91,7 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFinishLoadingURL:(NSURL *)URL;
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFailToLoadURL:(NSURL *)URL error:(NSError *)error;
 - (void)webBrowserViewControllerWillDismiss:(KINWebBrowserViewController*)viewController;
+- (NSArray*) webBrowserToolbarItems;
 @end
 
 
@@ -110,6 +111,7 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
 
 // The web views
 // Depending on the version of iOS, one of these will be set
+@property(nonatomic, strong) UIBarButtonItem *browserBackButtonItem, *browserForwardButtonItem, *browserRefreshButtonItem, *browserStopButtonItem, *browserFixedSeparator, *browserFlexibleSeparator;
 @property (nonatomic, strong) WKWebView *wkWebView;
 @property (nonatomic, strong) UIWebView *uiWebView;
 @property (nonatomic, readonly) UIView <KINWebBrowserView> *webView;
@@ -154,6 +156,8 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
 //Allow for custom activities in the browser by populating this optional array
 @property (nonatomic, strong) NSArray *customActivityItems;
 
+//@property(nonatomic, strong, readonly, getter=backButton) UIBarButtonItem *backButtonItem;
+//@property(nonatomic, strong, readonly, getter=forwardButton) UIBarButtonItem *forwardButtonItem;
 #pragma mark - Public Interface
 // Load a NSURLURLRequest to web view
 // Can be called any time after initialization
@@ -167,7 +171,6 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
 // Can be called any time after initialization
 - (void)loadURLString:(NSString *)URLString;
 
-
 // Loads an string containing HTML to web view
 // Can be called any time after initialization
 - (void)loadHTMLString:(NSString *)HTMLString;
@@ -176,6 +179,5 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
 - (void)stopLoading;
 - (void)goForward;
 - (void)goBack;
-
 @end
 

@@ -94,7 +94,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 @interface KINWebBrowserViewController () <UIAlertViewDelegate>
 
 @property(nonatomic, assign) BOOL previousNavigationControllerToolbarHidden, previousNavigationControllerNavigationBarHidden;
-@property(nonatomic, strong) UIBarButtonItem *backButton, *forwardButton, *refreshButton, *stopButton, *fixedSeparator, *flexibleSeparator;
+
 @property(nonatomic, strong) NSTimer *fakeProgressTimer;
 @property(nonatomic, strong) UIPopoverController *actionPopoverController;
 @property(nonatomic, assign) BOOL uiWebViewIsLoading;
@@ -105,6 +105,9 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 @property(nonatomic, strong) WKWebViewConfiguration *configuration;
 @property(nonatomic, strong) NSMutableDictionary *requestBalance;
 @property(nonatomic, strong) NSMutableDictionary *loadedURLS;
+@property (nonatomic,strong) NSArray *defaultBrowserToolbarItems;
+
+- (NSArray*) loadWebBrowserToolbarItems;
 @end
 
 
@@ -152,6 +155,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 #pragma mark - Initializers
 - (void) setup {
+    [self setupToolbarItems];
     self.requestBalance = [NSMutableDictionary dictionary];
     self.loadedURLS = [NSMutableDictionary dictionary];
     // self.configuration = configuration;
@@ -161,6 +165,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     self.externalAppPermissionAlertView = [[UIAlertView alloc] initWithTitle:@"Leave this app?"
                                                                      message:@"This web page is trying to open an outside app. Are you sure you want to open it?"
                                                                     delegate:self cancelButtonTitle:@"Cancel" otherButtonTitles:@"Open App", nil];
+
     _isActiveBrowser = NO;
 }
 - (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
@@ -217,12 +222,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         [self.uiWebView setScalesPageToFit:YES];
         [self.uiWebView.scrollView setAlwaysBounceVertical:YES];
         [self.view addSubview:self.uiWebView];
-
-        /*  [[NSNotificationCenter defaultCenter] addObserver:self
-                                                   selector:@selector(webViewHistoryDidChange:)
-                                                       name:@"WebHistoryItemChangedNotification"
-                                                     object:nil]; */
-
     }
 
     self.progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
@@ -245,9 +244,17 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
     if (!self.hidesBottomBarWhenPushed)
         [self.navigationController setToolbarHidden:NO animated:YES];
-
     [self.navigationController.navigationBar addSubview:self.progressView];
     [self updateToolbarState];
+}
+
+- (NSArray*) loadWebBrowserToolbarItems {
+    if([self.delegate conformsToProtocol:@protocol(KINWebBrowserDelegate)] &&
+            [self.delegate respondsToSelector:@selector(webBrowserToolbarItems)]) {
+        return [self.delegate webBrowserToolbarItems];
+    }
+
+    return self.defaultBrowserToolbarItems;
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -484,7 +491,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
         NSLog(@"+webViewDidStartLoad: loading=%@ (%@)\n\turl = %@\n\trequestUrl = %@\n\tmainDocument=%@", @(webView.isLoading), self.requestBalance[url.absoluteString], url, requestUrl, mainDocumentURL);
 
-
         if ([self.delegate respondsToSelector:@selector(webBrowser:didStartLoadingURL:)]) {
             [self.delegate webBrowser:self didStartLoadingURL:webView.request.URL];
         }
@@ -714,16 +720,12 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     else
         addressBarStatues |= KINAddressBarStatusCanRefresh | KINAddressBarStatusIsNotLoading; //todo: this should only be true if successfully loaded once
 
-    [self.backButton setEnabled:canGoBack];
-    [self.forwardButton setEnabled:canGoForward];
+    [self.browserBackButtonItem setEnabled:canGoBack];
+    [self.browserForwardButtonItem setEnabled:canGoForward];
 
-    if (!self.backButton) {
-        [self setupToolbarItems];
-    }
-
-    NSArray *barButtonItems;
+  //  NSArray *barButtonItems;
     if (self.isLoading) {
-        barButtonItems = @[self.backButton, self.fixedSeparator, self.forwardButton, self.fixedSeparator, self.stopButton, self.flexibleSeparator];
+        self.defaultBrowserToolbarItems = @[self.browserBackButtonItem, self.browserFixedSeparator, self.browserForwardButtonItem, self.browserFixedSeparator, self.browserStopButtonItem, self.browserFlexibleSeparator];
 
         if (self.showsURLInNavigationBar) {
             NSString *URLString = [self.URL absoluteString];
@@ -733,25 +735,27 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
             self.navigationItem.title = URLString;
         }
     } else {
-        barButtonItems = @[self.backButton, self.fixedSeparator, self.forwardButton, self.fixedSeparator, self.refreshButton, self.flexibleSeparator];
+        self.defaultBrowserToolbarItems  = @[self.browserBackButtonItem, self.browserFixedSeparator, self.browserForwardButtonItem, self.browserFixedSeparator, self.browserRefreshButtonItem, self.browserFlexibleSeparator];
 
         if (self.showsPageTitleInNavigationBar) {
             if (self.wkWebView) {
                 self.navigationItem.title = self.wkWebView.title;
-            }
-            else if (self.uiWebView) {
+            } else if (self.uiWebView) {
                 self.navigationItem.title = [self.uiWebView stringByEvaluatingJavaScriptFromString:@"document.title"];
             }
         }
     }
 
     if (!self.actionButtonHidden) {
-        NSMutableArray *mutableBarButtonItems = [NSMutableArray arrayWithArray:barButtonItems];
+        NSMutableArray *mutableBarButtonItems = [NSMutableArray arrayWithArray:self.defaultBrowserToolbarItems];
         [mutableBarButtonItems addObject:self.actionButton];
-        barButtonItems = [NSArray arrayWithArray:mutableBarButtonItems];
+        self.defaultBrowserToolbarItems  = [NSArray arrayWithArray:mutableBarButtonItems];
     }
 
-    [self setToolbarItems:barButtonItems animated:YES];
+    NSArray* barButtonItems = [self loadWebBrowserToolbarItems];
+
+    if(barButtonItems)
+        [self setToolbarItems:barButtonItems animated:YES];
 
     self.tintColor = self.tintColor;
     self.barTintColor = self.barTintColor;
@@ -762,18 +766,18 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void)setupToolbarItems {
     NSBundle *bundle = [NSBundle bundleForClass:[self class]];
 
-    self.refreshButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(refreshButtonPressed:)];
-    self.stopButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemStop target:self action:@selector(stopButtonPressed:)];
+    self.browserRefreshButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(refreshButtonPressed:)];
+    self.browserStopButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemStop target:self action:@selector(stopButtonPressed:)];
 
     UIImage *backbuttonImage = [UIImage imageWithContentsOfFile:[bundle pathForResource:@"backbutton" ofType:@"png"]];
-    self.backButton = [[UIBarButtonItem alloc] initWithImage:backbuttonImage style:UIBarButtonItemStylePlain target:self action:@selector(backButtonPressed:)];
+    self.browserBackButtonItem = [[UIBarButtonItem alloc] initWithImage:backbuttonImage style:UIBarButtonItemStylePlain target:self action:@selector(backButtonPressed:)];
 
     UIImage *forwardbuttonImage = [UIImage imageWithContentsOfFile:[bundle pathForResource:@"forwardbutton" ofType:@"png"]];
-    self.forwardButton = [[UIBarButtonItem alloc] initWithImage:forwardbuttonImage style:UIBarButtonItemStylePlain target:self action:@selector(forwardButtonPressed:)];
+    self.browserForwardButtonItem = [[UIBarButtonItem alloc] initWithImage:forwardbuttonImage style:UIBarButtonItemStylePlain target:self action:@selector(forwardButtonPressed:)];
     self.actionButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAction target:self action:@selector(actionButtonPressed:)];
-    self.fixedSeparator = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
-    self.fixedSeparator.width = 50.0f;
-    self.flexibleSeparator = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+    self.browserFixedSeparator = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
+    self.browserFixedSeparator.width = 50.0f;
+    self.browserFlexibleSeparator = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
 }
 
 #pragma mark - Done Button Action
@@ -785,7 +789,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 #pragma mark - UIBarButtonItem Target Action Methods
 
 - (void)backButtonPressed:(id)sender {
-
     [self goBack];
     [self updateToolbarState];
 }
