@@ -6,9 +6,9 @@
 #import "KINWebBrowserAddressBar.h"
 #import "KINWebBrowserViewController.h"
 
-static NSString *const kGoogleServiceRequestPath     = @"https://www.google.com/search?q=";
+static NSString *const kGoogleServiceRequestPath = @"https://www.google.com/search?q=";
 static NSString *const kDuckDuckGoServiceRequestPath = @"https://duckduckgo.com/?q=";
-static NSString *const kHostnameRegex                = @"((\\w)*|([0-9]*)|([-|_])*)+"
+static NSString *const kHostnameRegex = @"((\\w)*|([0-9]*)|([-|_])*)+"
         "([\\.|/]((\\w)*|([0-9]*)|([-|_])*))+";
 
 typedef NS_ENUM(NSInteger, KINAddressBarState) {
@@ -17,6 +17,7 @@ typedef NS_ENUM(NSInteger, KINAddressBarState) {
     KINAddressBarStateLoading, //url is being loaded, show cancel button
     KINAddressBarStateLoaded
 };
+
 @implementation KINAddressBarTextField
 //todo: style textfield, however
 @end
@@ -45,13 +46,13 @@ typedef NS_ENUM(NSInteger, KINAddressBarState) {
 @synthesize forwardButtonItem = _forwardButtonItem;
 @synthesize backwardButtonItem = _backwardButtonItem;
 
-- (instancetype _Nonnull)initWithFrame:(CGRect)frame items: (KINAddressBarButtonItem) defaultItems {
+- (instancetype _Nonnull)initWithFrame:(CGRect)frame items:(KINAddressBarButtonItem)defaultItems {
     if (self = [super initWithFrame:frame]) {
         self.searchService = KINAddressBarSearchGoogle;
         defaultItemMask = defaultItems;
-        CGFloat addressFieldWidth = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) ? self.self.bounds.size.width / 2 : self.self.bounds.size.width * 0.8;
+
         UITextField *addressField = self.addressField =
-                [[KINAddressBarTextField alloc] initWithFrame:CGRectMake(0, 0, addressFieldWidth, 30)];
+                [[KINAddressBarTextField alloc] initWithFrame:CGRectMake(0, 0,  self.self.bounds.size.width / 2 , 30)];
 
         addressField.borderStyle = UITextBorderStyleRoundedRect; //UITextBorderStyleLine;// UITextBorderStyleBezel; // UITextBorderStyleRoundedRect;
         addressField.tintColor = [UIColor redColor];
@@ -109,36 +110,57 @@ typedef NS_ENUM(NSInteger, KINAddressBarState) {
 
     return self;
 }
-- (instancetype)initWithFrame:(CGRect)frame {
-if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAddressBarButtonItemGoBack | KINAddressBarButtonItemGoForward]) {
 
-}
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAddressBarButtonItemGoBack | KINAddressBarButtonItemGoForward]) {
+
+    }
 
     return self;
 }
 
+- (void)layoutSubviews {
+    CGFloat usedWidths = self.addressFieldItemPadding;
+    for(UIBarButtonItem *item in self.items) {
+        CGFloat itemWidth = item.width > 0.0 ? item.width :
+                (CGFloat)(item.customView ? item.customView.bounds.size.width : 0.0);
+        if(![item isEqual:self.addressFieldItem])
+            usedWidths+=itemWidth;
+    }
+
+    if(self.addressFieldItem) {
+        CGRect addressFieldRect = self.addressFieldItem.customView.bounds;
+        CGFloat percentWidth = self.addressFieldItemPercentWidth > 0.0 ? self.addressFieldItemPercentWidth : (CGFloat)0.8;
+        CGFloat addressFieldWidth = (self.bounds.size.width - usedWidths) * percentWidth;
+        self.addressFieldItem.customView.bounds = CGRectMake(0,0,addressFieldWidth,addressFieldRect.size.height);
+    }
+
+    [super layoutSubviews];
+}
+
+
 - (UIBarButtonItem *)forwardButtonItem {
-   // UIBarButtonItem *forwardButtonItem = [[UIBarButtonItem alloc] initWithCustomView:self.forwardButton];
+    // UIBarButtonItem *forwardButtonItem = [[UIBarButtonItem alloc] initWithCustomView:self.forwardButton];
     return _forwardButtonItem;
 }
 
 - (UIBarButtonItem *)backwardButtonItem {
-  //  UIBarButtonItem *backwardButtonItem = [[UIBarButtonItem alloc] initWithCustomView:self.backButton];
+    //  UIBarButtonItem *backwardButtonItem = [[UIBarButtonItem alloc] initWithCustomView:self.backButton];
     return _backwardButtonItem;
 }
 
 
-- (NSArray*) defaultAddressBarItems {
+- (NSArray *)defaultAddressBarItems {
     NSMutableArray *maskedItems = [NSMutableArray arrayWithCapacity:1];
 
-    if(defaultItemMask& KINAddressBarButtonItemAddress)
+    if (defaultItemMask & KINAddressBarButtonItemAddress)
         [maskedItems addObject:self.addressFieldItem];
 
-    if(defaultItemMask& KINAddressBarButtonItemGoBack)
+    if (defaultItemMask & KINAddressBarButtonItemGoBack)
         [maskedItems addObject:self.backwardButtonItem];
 
 
-    if(defaultItemMask& KINAddressBarButtonItemGoForward)
+    if (defaultItemMask & KINAddressBarButtonItemGoForward)
         [maskedItems addObject:self.forwardButtonItem];
 
     return maskedItems;
@@ -147,21 +169,22 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
 - (void)setItems:(NSArray *)items animated:(BOOL)animated {
     NSMutableArray *addressBarItems = items ? [NSMutableArray arrayWithArray:items] : [NSMutableArray arrayWithCapacity:1];
 
-    if(![addressBarItems containsObject:self.addressFieldItem])
+    if (![addressBarItems containsObject:self.addressFieldItem])
         [addressBarItems insertObject:self.addressBarDelegate atIndex:0];
 
     [super setItems:addressBarItems animated:animated];
 }
 
-- (void)setAccessoryItems: (NSArray*)items animated:(BOOL)animated {
-    NSMutableArray *addressBarItems =[NSMutableArray array];
+- (void)setAccessoryItems:(NSArray *)items animated:(BOOL)animated {
+    NSMutableArray *addressBarItems = [NSMutableArray array];
     [addressBarItems addObjectsFromArray:[self defaultAddressBarItems]];
-    for(UIBarButtonItem *item in items) {
-        if([item isKindOfClass:[UIBarButtonItem class]])
+    for (UIBarButtonItem *item in items) {
+        if ([item isKindOfClass:[UIBarButtonItem class]])
             [addressBarItems addObject:item];
     }
     [super setItems:addressBarItems animated:animated];
 }
+
 - (UIImage *)loadBundleImageName:(NSString *)name {
 
     NSString *bundlePath = [[NSBundle bundleForClass:[self class]]
@@ -179,7 +202,7 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
 
 - (void)onActionTouchEvent:(id)event {
     NSLog(@"%@.%@:%@", self, NSStringFromSelector(_cmd), event);
-    switch(actionState) {
+    switch (actionState) {
         case KINAddressBarStateLoading:
             [self postAddressBarText:self.addressField.text action:KINAddressBarActionCancel];
             break;
@@ -207,20 +230,14 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
 }
 
 
-- (void) postAddressBarText:(NSString*) text action:(KINAddressBarAction) action {
-    /*NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
-    userInfo[@"text"] = text;
-    userInfo[@"action"] = @(action);
-    userInfo[@"onAddressBar"] = self;
-    [[NSNotificationCenter defaultCenter] postNotificationName:NSStringFromSelector(@selector(onAddressBar:text:action:)) object:
-            self userInfo:userInfo];*/
-    NSURL *url = [self validURLFromString: text];
+- (void)postAddressBarText:(NSString *)text action:(KINAddressBarAction)action {
+    NSURL *url = [self validURLFromString:text];
     NSString *urlString = [url absoluteString];
     if ([self.addressBarDelegate conformsToProtocol:@protocol(KINWebBrowserAddressBarDelegate)] &&
             [self.addressBarDelegate respondsToSelector:@selector(onAddressBar:text:action:)]) {
         [self.addressBarDelegate onAddressBar:self text:urlString action:action];
     }
-    POST_KINADDRESSBAR_NOTIFICATION(urlString,action);
+    POST_KINADDRESSBAR_NOTIFICATION(urlString, action);
 }
 
 
@@ -235,18 +252,18 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
     } else if (status & KINAddressBarStatusCanCancel) {
         actionState = KINAddressBarStateLoading;
         //[self.actionButton setImage:self.cancelActionImage forState:UIControlStateNormal];
-    } else  {
+    } else {
         NSLog(@"Unknown state");
     }
 
-  //  [self.backButton setEnabled:(status & KINAddressBarStatusCanGoBack)];
-  //  [self.forwardButton setEnabled:(status & KINAddressBarStatusCanGoForward)];
+    //  [self.backButton setEnabled:(status & KINAddressBarStatusCanGoBack)];
+    //  [self.forwardButton setEnabled:(status & KINAddressBarStatusCanGoForward)];
 
-    [self updateAddressBarText: addressBarText state:actionState status: status];
+    [self updateAddressBarText:addressBarText state:actionState status:status];
 }
 
-- (void) updateAddressBarText: (NSString*) text state:(KINAddressBarState) state status:(KINAddressBarStatus)status { //todo:move
-    switch(actionState) {
+- (void)updateAddressBarText:(NSString *)text state:(KINAddressBarState)state status:(KINAddressBarStatus)status { //todo:move
+    switch (actionState) {
         case KINAddressBarStateIntitial:
             self.addressField.placeholder = @"Search or enter website name";
             self.addressField.textAlignment = NSTextAlignmentCenter;
@@ -266,7 +283,7 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
     [self.backButton setEnabled:(status & KINAddressBarStatusCanGoBack)];
     [self.forwardButton setEnabled:(status & KINAddressBarStatusCanGoForward)];
 
-    if(text)
+    if (text)
         self.addressField.text = text;
 }
 
@@ -277,8 +294,8 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
     return;
 }
 
-- (void)textFieldDidBeginEditing:(UITextField * _Nonnull)textField {
-    if([textField.text length] >0)
+- (void)textFieldDidBeginEditing:(UITextField *_Nonnull)textField {
+    if ([textField.text length] > 0)
         [textField selectAll:textField];
 }
 
@@ -302,7 +319,7 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
 
 - (NSURL *)validURLFromString:(NSString *)query {
     // try to use query as an URL
-    if(!query)
+    if (!query)
         return nil;
     NSString *trimmedQuery = [query stringByTrimmingCharactersInSet:
             [NSCharacterSet whitespaceCharacterSet]];
@@ -314,7 +331,7 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
             return url;
         }
         if ([self validateHostname:query]) {
-            url = [self validURLFromString: [NSString stringWithFormat:@"http://%@", query]];
+            url = [self validURLFromString:[NSString stringWithFormat:@"http://%@", query]];
             return url;
         }
     }
@@ -335,7 +352,7 @@ if(self = [self initWithFrame:frame items:KINAddressBarButtonItemAddress | KINAd
     NSCharacterSet *set = [NSCharacterSet URLHostAllowedCharacterSet];
     NSString *encodedQuery = [query stringByAddingPercentEncodingWithAllowedCharacters:set];
 
-    url = [NSURL URLWithString:[NSString stringWithFormat:@"%@%@", currentSearchServiceRequestPath,encodedQuery]];
+    url = [NSURL URLWithString:[NSString stringWithFormat:@"%@%@", currentSearchServiceRequestPath, encodedQuery]];
     return url;
 }
 

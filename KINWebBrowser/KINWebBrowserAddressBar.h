@@ -57,7 +57,7 @@ typedef NS_ENUM(NSInteger, KINAddressBarSearchService) {
 @required
 - (void) updateAddressBarBrowser: (KINWebBrowserViewController *) browser status:(KINAddressBarStatus) status;
 - (void) postAddressBarText:(NSString*) text action:(KINAddressBarAction) action; //should be called internally to send notfications to all listeners. SEE POST_KINADDRESSBAR_NOTIFICATION macro if implementation details
-- (void)setAccessoryItems: (NSArray*)items animated:(BOOL)animated;
+- (void) setAccessoryItems: (NSArray*)items animated:(BOOL)animated;
 @end
 
 @protocol KINWebBrowserAddressBarDelegate <NSObject>
@@ -68,9 +68,11 @@ typedef NS_ENUM(NSInteger, KINAddressBarSearchService) {
 - (instancetype _Nonnull)initWithFrame:(CGRect)aRect items: (KINAddressBarButtonItem) items;
 @property (nonatomic, weak) id <KINWebBrowserAddressBarDelegate> addressBarDelegate;
 @property (nonatomic,assign) KINAddressBarSearchService searchService;
+@property (nonatomic,assign) CGFloat addressFieldItemPercentWidth; //
+@property (nonatomic,assign) CGFloat addressFieldItemPadding;
 @property (nonatomic,retain) UIBarButtonItem *addressFieldItem;
 @property (nonatomic,retain, readonly) UIBarButtonItem *forwardButtonItem;
 @property (nonatomic,retain, readonly) UIBarButtonItem *backwardButtonItem;
 - (void) updateAddressBarBrowser: (KINWebBrowserViewController *) browser status:(KINAddressBarStatus) status;
-- (void)setAccessoryItems: (NSArray*)items animated:(BOOL)animated;
+- (void) setAccessoryItems: (NSArray*)items animated:(BOOL)animated;
 @end
