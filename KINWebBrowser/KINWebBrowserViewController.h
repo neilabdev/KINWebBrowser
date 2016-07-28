@@ -125,6 +125,8 @@ typedef NS_ENUM(NSInteger,KINBrowserToolbarButtonIndex) {
 // The main and only UIProgressView
 @property (nonatomic, strong) UIProgressView *progressView;
 
+
+- (void) enableSnapshot:(BOOL) truth  __deprecated;
 // The web views
 // Depending on the version of iOS, one of these will be set
 @property(nonatomic, strong) UIBarButtonItem *browserBackButtonItem, *browserForwardButtonItem, *browserRefreshButtonItem,

@@ -32,14 +32,16 @@
 
 
 #import "KINWebBrowserExampleViewController.h"
-
+#import "KINSnapshotExampleViewController.h"
 
 @interface KINWebBrowserExampleViewController ()
 @property (nonatomic,retain) NSMutableArray *bottomToolbarItems;
 @property (nonatomic,retain)UIBarButtonItem *browserTakeShopshotButton;
+@property (nonatomic,retain) KINWebBrowserViewController *webBrowser;
+@property (nonatomic,assign) BOOL snapshotEnabled;
 @end
 
-static NSString *const defaultAddress = @"https://www.apple.com";
+static NSString *const defaultAddress =  @"http://blogs.spectator.co.uk/2016/07/will-politicians-accept-reality-islamic-terrorism/"; // @"https://www.apple.com";
 
 @implementation KINWebBrowserExampleViewController
 
@@ -48,6 +50,7 @@ static NSString *const defaultAddress = @"https://www.apple.com";
     self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
     if (self) {
         // Custom initialization
+        self.snapshotEnabled = NO;
     }
     return self;
 }
@@ -71,6 +74,18 @@ static NSString *const defaultAddress = @"https://www.apple.com";
 
 - (void) takeSnapshot:(id) sender {
     NSLog(@"take snapshot");
+    self.snapshotEnabled = !self.snapshotEnabled;
+    [self.webBrowser enableSnapshot:self.snapshotEnabled];
+
+    KINSnapshotExampleViewController *snapshotExampleViewController =
+            [[KINSnapshotExampleViewController alloc] initWithBrowser:self.webBrowser];
+
+    UINavigationController *navigationController =
+            [[UINavigationController alloc] initWithRootViewController:snapshotExampleViewController];
+    [self presentViewController:navigationController animated:YES completion:^{
+
+    }];
+
 }
 
 - (NSArray *)webBrowser:(KINWebBrowserViewController *)webBrowser toolbarItems:(NSArray *)items {
@@ -110,7 +125,7 @@ static NSString *const defaultAddress = @"https://www.apple.com";
     NSLog(@"Finished Loading URL : %@", URL);
 }
 
-- (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFailToLoadURL:(NSURL *)URL withError:(NSError *)error {
+- (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFailToLoadURL:(NSURL *)URL error:(NSError *)error {
     NSLog(@"Failed To Load URL : %@ With Error: %@", URL, error);
 }
 
@@ -123,7 +138,7 @@ static NSString *const defaultAddress = @"https://www.apple.com";
 #pragma mark - IBActions
 
 - (IBAction)pushButtonPressed:(id)sender {
-    KINWebBrowserViewController *webBrowser = [KINWebBrowserViewController webBrowser];
+    KINWebBrowserViewController *webBrowser =  self.webBrowser = [KINWebBrowserViewController webBrowser];
     [webBrowser setDelegate:self];
     [self.navigationController pushViewController:webBrowser animated:YES];
     [webBrowser loadURLString:defaultAddress];
@@ -131,7 +146,7 @@ static NSString *const defaultAddress = @"https://www.apple.com";
 
 - (IBAction)presentButtonPressed:(id)sender {
     UINavigationController *webBrowserNavigationController = [KINWebBrowserViewController navigationControllerWithWebBrowser];
-    KINWebBrowserViewController *webBrowser = [webBrowserNavigationController rootWebBrowser];
+    KINWebBrowserViewController *webBrowser = self.webBrowser = [webBrowserNavigationController rootWebBrowser];
     [webBrowser setDelegate:self];
     webBrowser.showsURLInNavigationBar = YES;
     webBrowser.tintColor = [UIColor whiteColor];

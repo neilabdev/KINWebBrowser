@@ -107,12 +107,12 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 @property(nonatomic, strong) NSMutableDictionary *loadedURLS;
 @property (nonatomic,strong) NSArray *defaultBrowserToolbarItems;
 @property (nonatomic,assign) BOOL configuredAutolayout;
-@property (nonatomic,retain) UIView *browserHeaderViewCanvas;
-
 @property (nonatomic,retain) NSMutableArray *progressViewConstraints;
 @property (nonatomic,retain) NSMutableArray *webViewConstraints;
 @property (nonatomic,retain) NSMutableArray *headerViewConstraints;
 
+@property (nonatomic,retain) NSLayoutConstraint *browserViewBottomConstraint;
+@property (nonatomic,retain) NSLayoutConstraint *browserViewHeightConstraint;
 
 - (NSArray*) loadWebBrowserToolbarItems;
 @end
@@ -170,7 +170,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     self.actionButtonHidden = NO;
     self.showsURLInNavigationBar = NO;
     self.showsPageTitleInNavigationBar = YES;
-    self.browserHeaderViewCanvas = [[UIView alloc] initWithFrame:CGRectZero];
     self.externalAppPermissionAlertView = [[UIAlertView alloc] initWithTitle:@"Leave this app?"
                                                                      message:@"This web page is trying to open an outside app. Are you sure you want to open it?"
                                                                     delegate:self cancelButtonTitle:@"Cancel" otherButtonTitles:@"Open App", nil];
@@ -228,7 +227,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         [self.wkWebView setAutoresizesSubviews:YES];
         [self.wkWebView.scrollView setAlwaysBounceVertical:YES];
         [self.view addSubview:self.wkWebView];
-        [self.wkWebView addObserver:self forKeyPath:NSStringFromSelector(@selector(estimatedProgress))
+        [self.wkWebView addObserver:self
+                         forKeyPath:NSStringFromSelector(@selector(estimatedProgress))
                             options:0 context:KINWebBrowserContext];
     } else if (self.uiWebView) {
         [self.uiWebView setFrame:self.view.bounds];
@@ -255,22 +255,27 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void)updateViewConstraints {
     [super updateViewConstraints];
 
-    UIView *topView = self.progressView;
+
 
     if(!self.configuredAutolayout) {
-      //  [self.progressViewConstraints addObject:<#(id)anObject#>];
+        UIView *topView = self.progressView;
 
-        if([self.progressViewConstraints count]>0)
+        if([self.progressViewConstraints count]>0) {
             [self.view removeConstraints:self.progressViewConstraints];
+            [self.progressViewConstraints removeAllObjects];
+        }
 
-        if([self.webViewConstraints count]>0)
+        if([self.webViewConstraints count]>0) {
             [self.view removeConstraints:self.webViewConstraints];
-
-        if([self.headerViewConstraints count]>0)
+            [self.webViewConstraints removeAllObjects];
+        }
+        if([self.headerViewConstraints count]>0){
             [self.view removeConstraints:self.headerViewConstraints];
+            [self.headerViewConstraints removeAllObjects];
+        }
 
         self.progressView.translatesAutoresizingMaskIntoConstraints = NO;
-        topView = self.progressView;
+
         NSLayoutConstraint *progressViewRightConstraint =
                 [NSLayoutConstraint constraintWithItem:self.progressView
                                      attribute:NSLayoutAttributeRight
@@ -294,7 +299,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                                              attribute:NSLayoutAttributeWidth
                                              relatedBy:NSLayoutRelationEqual
                                                 toItem:self.view
-                                             attribute:NSLayoutAttributeWidth multiplier:1 constant:2];
+                                             attribute:NSLayoutAttributeWidth multiplier:1 constant:0];
 
         [self.progressViewConstraints addObjectsFromArray:
                 @[
@@ -327,7 +332,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                                                  attribute:NSLayoutAttributeWidth
                                                  relatedBy:NSLayoutRelationEqual
                                                     toItem:self.view
-                                                 attribute:NSLayoutAttributeWidth multiplier:1 constant:2];
+                                                 attribute:NSLayoutAttributeWidth multiplier:1 constant:0];
             [self.headerViewConstraints addObjectsFromArray:
                     @[headerViewRightConstraint, headerViewTopConstraint,headerViewWidthConstraint]
             ];
@@ -354,19 +359,33 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                                              attribute:NSLayoutAttributeWidth
                                              relatedBy:NSLayoutRelationEqual
                                                 toItem:self.view
-                                             attribute:NSLayoutAttributeWidth multiplier:1 constant:2];
+                                             attribute:NSLayoutAttributeWidth multiplier:1 constant:0];
 
-        NSLayoutConstraint *browserViewBottomConstraint =
+        self.browserViewBottomConstraint =
                 [NSLayoutConstraint constraintWithItem:self.webView
                                              attribute:NSLayoutAttributeBottom
                                              relatedBy:NSLayoutRelationEqual
                                                 toItem:self.bottomLayoutGuide
                                              attribute:NSLayoutAttributeTop multiplier:1 constant:0];
 
+        self.browserViewBottomConstraint.priority = UILayoutPriorityDefaultHigh;
+
+        CGSize webViewContentSize =  self.webView.scrollView.contentSize;
+
+        self.browserViewHeightConstraint =
+                [NSLayoutConstraint constraintWithItem:self.webView
+                                             attribute:NSLayoutAttributeHeight
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:nil
+                                             attribute:NSLayoutAttributeNotAnAttribute  multiplier:1 constant:webViewContentSize.height];
+
+       self.browserViewHeightConstraint.priority = UILayoutPriorityDefaultLow;
+        //browserViewHeightConstraint.active
+
         self.webView.translatesAutoresizingMaskIntoConstraints = NO;
 
         [self.webViewConstraints addObjectsFromArray:
-                @[browserViewRightConstraint,browserViewTopConstraint,browserViewWidthConstraint,browserViewBottomConstraint]
+                @[browserViewRightConstraint,browserViewTopConstraint,browserViewWidthConstraint,self.browserViewBottomConstraint,self.browserViewHeightConstraint] //browserViewHeightConstraint
         ];
 
         [self.view addConstraints:self.webViewConstraints];
@@ -374,6 +393,17 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     }
 }
 
+- (void) enableSnapshot:(BOOL) truth {
+
+    if(truth) {
+        self.browserViewBottomConstraint.active = NO;
+        self.browserViewHeightConstraint.constant = self.webView.scrollView.contentSize.height;
+
+    } else {
+        self.browserViewBottomConstraint.active = YES;
+        self.browserViewHeightConstraint.constant = self.webView.scrollView.contentSize.height;
+    }
+}
 
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -527,7 +557,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         return self.uiWebViewIsLoading;
     }
 }
-
 
 - (void)setTintColor:(UIColor *)tintColor {
     _tintColor = tintColor;
