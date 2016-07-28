@@ -94,7 +94,8 @@ typedef NS_ENUM(NSInteger,KINBrowserToolbarButtonIndex) {
     KINBrowserToolbarButtonIndexFixedSeparator2=3,
     KINBrowserToolbarButtonIndexRefresh=4,
     KINBrowserToolbarButtonIndexStop=4,
-    KINBrowserToolbarButtonIndexFlexibleSeparator1=5
+    KINBrowserToolbarButtonIndexFlexibleSeparator1=5,
+    KINBrowserToolbarButtonIndexAction=6
 };
 
 @protocol KINWebBrowserDelegate <NSObject>

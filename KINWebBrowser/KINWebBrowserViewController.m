@@ -106,6 +106,13 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 @property(nonatomic, strong) NSMutableDictionary *requestBalance;
 @property(nonatomic, strong) NSMutableDictionary *loadedURLS;
 @property (nonatomic,strong) NSArray *defaultBrowserToolbarItems;
+@property (nonatomic,assign) BOOL configuredAutolayout;
+@property (nonatomic,retain) UIView *browserHeaderViewCanvas;
+
+@property (nonatomic,retain) NSMutableArray *progressViewConstraints;
+@property (nonatomic,retain) NSMutableArray *webViewConstraints;
+@property (nonatomic,retain) NSMutableArray *headerViewConstraints;
+
 
 - (NSArray*) loadWebBrowserToolbarItems;
 @end
@@ -163,9 +170,15 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     self.actionButtonHidden = NO;
     self.showsURLInNavigationBar = NO;
     self.showsPageTitleInNavigationBar = YES;
+    self.browserHeaderViewCanvas = [[UIView alloc] initWithFrame:CGRectZero];
     self.externalAppPermissionAlertView = [[UIAlertView alloc] initWithTitle:@"Leave this app?"
                                                                      message:@"This web page is trying to open an outside app. Are you sure you want to open it?"
                                                                     delegate:self cancelButtonTitle:@"Cancel" otherButtonTitles:@"Open App", nil];
+
+    self.progressViewConstraints = [NSMutableArray array];
+    self.headerViewConstraints = [NSMutableArray array];
+    self.webViewConstraints = [NSMutableArray array];
+
     _isActiveBrowser = NO;
 }
 
@@ -205,7 +218,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
     self.previousNavigationControllerToolbarHidden = self.navigationController.toolbarHidden;
     self.previousNavigationControllerNavigationBarHidden = self.navigationController.navigationBarHidden;
-
+    self.automaticallyAdjustsScrollViewInsets=NO;
     if (self.wkWebView) {
         [self.wkWebView setFrame:self.view.bounds];
         [self.wkWebView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
@@ -230,10 +243,138 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
     self.progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
     [self.progressView setTrackTintColor:[UIColor colorWithWhite:1.0f alpha:0.0f]];
-    [self.progressView setFrame:CGRectMake(0, self.navigationController.navigationBar.frame.size.height - self.progressView.frame.size.height, self.view.frame.size.width, self.progressView.frame.size.height)];
-    [self.progressView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin];
-    [self organizeViews];
+    [self.view addSubview:self.progressView];
+    [self.view setNeedsUpdateConstraints];
 }
+
+- (void) resetViewConstraints {
+    self.configuredAutolayout = NO;
+    [self.view setNeedsUpdateConstraints];
+}
+
+- (void)updateViewConstraints {
+    [super updateViewConstraints];
+
+    UIView *topView = self.progressView;
+
+    if(!self.configuredAutolayout) {
+      //  [self.progressViewConstraints addObject:<#(id)anObject#>];
+
+        if([self.progressViewConstraints count]>0)
+            [self.view removeConstraints:self.progressViewConstraints];
+
+        if([self.webViewConstraints count]>0)
+            [self.view removeConstraints:self.webViewConstraints];
+
+        if([self.headerViewConstraints count]>0)
+            [self.view removeConstraints:self.headerViewConstraints];
+
+        self.progressView.translatesAutoresizingMaskIntoConstraints = NO;
+        topView = self.progressView;
+        NSLayoutConstraint *progressViewRightConstraint =
+                [NSLayoutConstraint constraintWithItem:self.progressView
+                                     attribute:NSLayoutAttributeRight
+                                     relatedBy:NSLayoutRelationEqual
+                                        toItem:self.view
+                                     attribute:NSLayoutAttributeRight multiplier:1 constant:0];
+        NSLayoutConstraint *progressViewLeftConstraint =
+                [NSLayoutConstraint constraintWithItem:self.progressView
+                                             attribute:NSLayoutAttributeLeft
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.view
+                                             attribute:NSLayoutAttributeLeft multiplier:1 constant:0];
+        NSLayoutConstraint *progressViewTopConstraint =
+                [NSLayoutConstraint constraintWithItem:self.progressView
+                                     attribute:NSLayoutAttributeTop
+                                     relatedBy:NSLayoutRelationEqual
+                                        toItem:self.topLayoutGuide
+                                     attribute:NSLayoutAttributeBottom multiplier:1 constant:0];
+        NSLayoutConstraint *progressViewWidthConstraint =
+                [NSLayoutConstraint constraintWithItem:self.progressView
+                                             attribute:NSLayoutAttributeWidth
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.view
+                                             attribute:NSLayoutAttributeWidth multiplier:1 constant:2];
+
+        [self.progressViewConstraints addObjectsFromArray:
+                @[
+                        progressViewLeftConstraint,
+                        progressViewTopConstraint,
+                        progressViewWidthConstraint
+                ]
+        ];
+        [self.view addConstraints:self.progressViewConstraints];
+
+        if(self.browserHeaderView) {
+            topView = self.browserHeaderView;
+            self.browserHeaderView.translatesAutoresizingMaskIntoConstraints = NO;
+            NSLayoutConstraint *headerViewRightConstraint =
+                    [NSLayoutConstraint constraintWithItem:self.browserHeaderView
+                                                 attribute:NSLayoutAttributeRight
+                                                 relatedBy:NSLayoutRelationEqual
+                                                    toItem:self.view
+                                                 attribute:NSLayoutAttributeRight multiplier:1 constant:0];
+
+            NSLayoutConstraint *headerViewTopConstraint =
+                    [NSLayoutConstraint constraintWithItem:self.browserHeaderView
+                                                 attribute:NSLayoutAttributeTop
+                                                 relatedBy:NSLayoutRelationEqual
+                                                    toItem:self.progressView
+                                                 attribute:NSLayoutAttributeBottom multiplier:1 constant:0];
+
+            NSLayoutConstraint *headerViewWidthConstraint =
+                    [NSLayoutConstraint constraintWithItem:self.browserHeaderView
+                                                 attribute:NSLayoutAttributeWidth
+                                                 relatedBy:NSLayoutRelationEqual
+                                                    toItem:self.view
+                                                 attribute:NSLayoutAttributeWidth multiplier:1 constant:2];
+            [self.headerViewConstraints addObjectsFromArray:
+                    @[headerViewRightConstraint, headerViewTopConstraint,headerViewWidthConstraint]
+            ];
+
+            [self.view addConstraints:self.headerViewConstraints];
+        }
+
+        NSLayoutConstraint *browserViewRightConstraint =
+                [NSLayoutConstraint constraintWithItem:self.webView
+                                             attribute:NSLayoutAttributeRight
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.view
+                                             attribute:NSLayoutAttributeRight multiplier:1 constant:0];
+
+        NSLayoutConstraint *browserViewTopConstraint =
+                [NSLayoutConstraint constraintWithItem:self.webView
+                                             attribute:NSLayoutAttributeTop
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:topView
+                                             attribute:NSLayoutAttributeBottom multiplier:1 constant:0];
+
+        NSLayoutConstraint *browserViewWidthConstraint =
+                [NSLayoutConstraint constraintWithItem:self.webView
+                                             attribute:NSLayoutAttributeWidth
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.view
+                                             attribute:NSLayoutAttributeWidth multiplier:1 constant:2];
+
+        NSLayoutConstraint *browserViewBottomConstraint =
+                [NSLayoutConstraint constraintWithItem:self.webView
+                                             attribute:NSLayoutAttributeBottom
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.bottomLayoutGuide
+                                             attribute:NSLayoutAttributeTop multiplier:1 constant:0];
+
+        self.webView.translatesAutoresizingMaskIntoConstraints = NO;
+
+        [self.webViewConstraints addObjectsFromArray:
+                @[browserViewRightConstraint,browserViewTopConstraint,browserViewWidthConstraint,browserViewBottomConstraint]
+        ];
+
+        [self.view addConstraints:self.webViewConstraints];
+        self.configuredAutolayout = YES;
+    }
+}
+
+
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
@@ -247,7 +388,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
     if (!self.hidesBottomBarWhenPushed)
         [self.navigationController setToolbarHidden:NO animated:YES];
-    [self.navigationController.navigationBar addSubview:self.progressView];
+  //  [self.navigationController.navigationBar addSubview:self.progressView]; //todo: perhaps make visiable?
     [self updateToolbarState];
 }
 
@@ -272,26 +413,9 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     [self.navigationController setNavigationBarHidden:self.previousNavigationControllerNavigationBarHidden animated:animated];
     [self.navigationController setToolbarHidden:self.previousNavigationControllerToolbarHidden animated:animated];
     [self stopLoading]; // no need to continue loading if will become invisible. Hopefully deleages are called bore they are assigned nill
-    //  [self.uiWebView setDelegate:nil];
-    //  [self.wkWebView setUIDelegate:nil];
-    //  [self.wkWebView setNavigationDelegate:nil];
-    [self.progressView removeFromSuperview];
 }
 
-- (void)viewWillLayoutSubviews {
-    [super viewWillLayoutSubviews];
-    [self organizeViews];
-}
 
-- (void)organizeViews {
-    UIView *browserWindow = self.webView;
-    CGFloat y_offset = 0;
-    if (self.browserHeaderView && ![self.browserHeaderView isHidden]) {
-        browserWindow.frame = CGRectMake(0, 0, self.view.bounds.size.width, y_offset = self.browserHeaderView.bounds.size.height);
-    }
-
-    browserWindow.frame = CGRectMake(0, y_offset, self.view.bounds.size.width, self.view.bounds.size.height);
-}
 
 - (void)setBrowserHeaderView:(UIView *)browserHeaderView {
     if (browserHeaderView != _browserHeaderView) {
@@ -302,6 +426,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
             [self.view addSubview:browserHeaderView];
         }
         [self.view setNeedsLayout];
+        [self resetViewConstraints];
     }
 
     _browserHeaderView = browserHeaderView;
@@ -794,12 +919,17 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
     UIImage *forwardbuttonImage = [UIImage imageWithContentsOfFile:[bundle pathForResource:@"forwardbutton" ofType:@"png"]];
     self.browserForwardButtonItem = [[UIBarButtonItem alloc] initWithImage:forwardbuttonImage style:UIBarButtonItemStylePlain target:self action:@selector(forwardButtonPressed:)];
+    self.browserForwardButtonItem.tag = KINBrowserToolbarButtonIndexForward;
     self.browserActionButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAction target:self action:@selector(actionButtonPressed:)];
+    self.browserActionButton.tag = KINBrowserToolbarButtonIndexAction;
     self.browserFixedSeparator1 = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
+    self.browserFixedSeparator1.tag = KINBrowserToolbarButtonIndexFixedSeparator1;
     self.browserFixedSeparator1.width = 50.0f;
     self.browserFixedSeparator2 = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
     self.browserFixedSeparator2.width = 50.0f;
+    self.browserFixedSeparator2.tag = KINBrowserToolbarButtonIndexFixedSeparator2;
     self.browserFlexibleSeparator1 = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+    self.browserFlexibleSeparator1.tag = KINBrowserToolbarButtonIndexFlexibleSeparator1;
     self.browserFlexibleSeparator2 = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
 }
 
