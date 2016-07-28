@@ -1,7 +1,9 @@
 source 'https://github.com/CocoaPods/Specs.git'
 
-xcodeproj 'KINWebBrowserExample.xcodeproj'
+project 'KINWebBrowserExample.xcodeproj'
 platform :ios, :deployment_target => '8.0'
 
-pod "KINWebBrowser", :path => "../KINWebBrowser.podspec"
 
+target "KINWebBrowserExample" do
+	pod "KINWebBrowser", :path => "../KINWebBrowser.podspec"
+end
