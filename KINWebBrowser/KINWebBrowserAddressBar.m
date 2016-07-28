@@ -45,6 +45,8 @@ typedef NS_ENUM(NSInteger, KINAddressBarState) {
 }
 @synthesize forwardButtonItem = _forwardButtonItem;
 @synthesize backwardButtonItem = _backwardButtonItem;
+@synthesize addressFieldItemPercentWidth;
+@synthesize addressFieldItemPadding;
 
 - (instancetype _Nonnull)initWithFrame:(CGRect)frame items:(KINAddressBarButtonItem)defaultItems {
     if (self = [super initWithFrame:frame]) {
