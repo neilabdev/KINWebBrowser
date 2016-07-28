@@ -169,7 +169,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     _isActiveBrowser = NO;
 }
 
-- (void) setupWebview {
+- (void) setupWebView {
     if(self.wkWebView || self.uiWebView)
         return;
     NSString *version = [UIDevice currentDevice].systemVersion;
@@ -188,7 +188,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     return self;
 }
 
-
 - (id)initWithConfiguration:(WKWebViewConfiguration *)configuration {
     if (self = [super initWithNibName:nil bundle:nil]) {
         self.browserViewClass = [WKWebView class];
@@ -202,7 +201,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    [self setupWebview];
+    [self setupWebView];
 
     self.previousNavigationControllerToolbarHidden = self.navigationController.toolbarHidden;
     self.previousNavigationControllerNavigationBarHidden = self.navigationController.navigationBarHidden;
@@ -253,6 +252,12 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 }
 
 - (NSArray*) loadWebBrowserToolbarItems {
+
+    if([self.delegate conformsToProtocol:@protocol(KINWebBrowserDelegate)] &&
+            [self.delegate respondsToSelector:@selector(webBrowser:toolbarItems:)]) {
+        return [self.delegate webBrowser:self toolbarItems:self.defaultBrowserToolbarItems];
+    }
+
     if([self.delegate conformsToProtocol:@protocol(KINWebBrowserDelegate)] &&
             [self.delegate respondsToSelector:@selector(webBrowserToolbarItems)]) {
         return [self.delegate webBrowserToolbarItems];
@@ -346,7 +351,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 }
 
 - (void)stopLoading {
-    [self setupWebview]; //note: every call uses this function, so checks for init here. will move eventually
+    [self setupWebView]; //note: every call uses this function, so checks for init here. will move eventually
     self.uiWebViewIsLoading = NO;
     self.uiWebViewLoadedURL = nil;
     [self.requestBalance removeAllObjects];
@@ -415,6 +420,16 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void)setActionButtonHidden:(BOOL)actionButtonHidden {
     _actionButtonHidden = actionButtonHidden;
     [self updateToolbarState];
+}
+
+#pragma mark - Depricated properties
+
+- (UIBarButtonItem *)actionButton {
+    return self.browserActionButton;
+}
+
+- (void)setActionButton:(UIBarButtonItem *)actionButton {
+    self.browserActionButton = actionButton;
 }
 
 
@@ -712,8 +727,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 - (void)updateToolbarState {
     KINAddressBarStatus addressBarStatues = KINAddressBarStatusNone;
-    BOOL canGoBack = self.wkWebView.canGoBack || self.uiWebView.canGoBack;
-    BOOL canGoForward = self.wkWebView.canGoForward || self.uiWebView.canGoForward;
+    BOOL canGoBack = self.webView.canGoBack;
+    BOOL canGoForward =  self.webView.canGoForward;
 
     if (canGoBack)
         addressBarStatues |= KINAddressBarStatusCanGoBack;
@@ -730,7 +745,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
   //  NSArray *barButtonItems;
     if (self.isLoading) {
-        self.defaultBrowserToolbarItems = @[self.browserBackButtonItem, self.browserFixedSeparator, self.browserForwardButtonItem, self.browserFixedSeparator, self.browserStopButtonItem, self.browserFlexibleSeparator];
+        self.defaultBrowserToolbarItems = @[self.browserBackButtonItem, self.browserFixedSeparator1, self.browserForwardButtonItem, self.browserFixedSeparator2, self.browserStopButtonItem, self.browserFlexibleSeparator1];
 
         if (self.showsURLInNavigationBar) {
             NSString *URLString = [self.URL absoluteString];
@@ -740,7 +755,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
             self.navigationItem.title = URLString;
         }
     } else {
-        self.defaultBrowserToolbarItems  = @[self.browserBackButtonItem, self.browserFixedSeparator, self.browserForwardButtonItem, self.browserFixedSeparator, self.browserRefreshButtonItem, self.browserFlexibleSeparator];
+        self.defaultBrowserToolbarItems  = @[self.browserBackButtonItem, self.browserFixedSeparator1, self.browserForwardButtonItem, self.browserFixedSeparator2, self.browserRefreshButtonItem, self.browserFlexibleSeparator1];
 
         if (self.showsPageTitleInNavigationBar) {
             if (self.wkWebView) {
@@ -753,8 +768,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
     if (!self.actionButtonHidden) {
         NSMutableArray *mutableBarButtonItems = [NSMutableArray arrayWithArray:self.defaultBrowserToolbarItems];
-        [mutableBarButtonItems addObject:self.actionButton];
-        self.defaultBrowserToolbarItems  = [NSArray arrayWithArray:mutableBarButtonItems];
+        [mutableBarButtonItems addObject:self.browserActionButton];
+        self.defaultBrowserToolbarItems  = mutableBarButtonItems;
     }
 
     NSArray* barButtonItems = [self loadWebBrowserToolbarItems];
@@ -779,10 +794,13 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
     UIImage *forwardbuttonImage = [UIImage imageWithContentsOfFile:[bundle pathForResource:@"forwardbutton" ofType:@"png"]];
     self.browserForwardButtonItem = [[UIBarButtonItem alloc] initWithImage:forwardbuttonImage style:UIBarButtonItemStylePlain target:self action:@selector(forwardButtonPressed:)];
-    self.actionButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAction target:self action:@selector(actionButtonPressed:)];
-    self.browserFixedSeparator = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
-    self.browserFixedSeparator.width = 50.0f;
-    self.browserFlexibleSeparator = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+    self.browserActionButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAction target:self action:@selector(actionButtonPressed:)];
+    self.browserFixedSeparator1 = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
+    self.browserFixedSeparator1.width = 50.0f;
+    self.browserFixedSeparator2 = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
+    self.browserFixedSeparator2.width = 50.0f;
+    self.browserFlexibleSeparator1 = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+    self.browserFlexibleSeparator2 = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
 }
 
 #pragma mark - Done Button Action
@@ -841,7 +859,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                     [self.actionPopoverController dismissPopoverAnimated:YES];
                 }
                 self.actionPopoverController = [[UIPopoverController alloc] initWithContentViewController:controller];
-                [self.actionPopoverController presentPopoverFromBarButtonItem:self.actionButton permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+                [self.actionPopoverController presentPopoverFromBarButtonItem:self.browserActionButton permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
             }
             else {
                 [self presentViewController:controller animated:YES completion:NULL];

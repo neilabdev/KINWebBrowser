@@ -84,6 +84,19 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
     KINBrowserNavigationTypeOther
 };
 
+typedef NS_ENUM(NSInteger,KINBrowserToolbarButtonIndex) {
+    // @[self.browserBackButtonItem=0, self.browserFixedSeparator1=1, self.browserForwardButtonItem=2,
+    // self.browserFixedSeparator2=3, (self.browserStopButtonItem | refresh)=4, self.browserFlexibleSeparator1=5];
+
+    KINBrowserToolbarButtonIndexBack=0,
+    KINBrowserToolbarButtonIndexFixedSeparator1=1,
+    KINBrowserToolbarButtonIndexForward=2,
+    KINBrowserToolbarButtonIndexFixedSeparator2=3,
+    KINBrowserToolbarButtonIndexRefresh=4,
+    KINBrowserToolbarButtonIndexStop=4,
+    KINBrowserToolbarButtonIndexFlexibleSeparator1=5
+};
+
 @protocol KINWebBrowserDelegate <NSObject>
 @optional
 - (BOOL)webBrowser:(KINWebBrowserViewController *)webBrowser shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(KINBrowserNavigationType)navigationType;
@@ -91,7 +104,9 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFinishLoadingURL:(NSURL *)URL;
 - (void)webBrowser:(KINWebBrowserViewController *)webBrowser didFailToLoadURL:(NSURL *)URL error:(NSError *)error;
 - (void)webBrowserViewControllerWillDismiss:(KINWebBrowserViewController*)viewController;
-- (NSArray*) webBrowserToolbarItems;
+- (NSArray*) webBrowserToolbarItems __deprecated;
+- (NSArray*) webBrowser:(KINWebBrowserViewController *)webBrowser toolbarItems:(NSArray*)items;
+
 @end
 
 
@@ -111,7 +126,9 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
 
 // The web views
 // Depending on the version of iOS, one of these will be set
-@property(nonatomic, strong) UIBarButtonItem *browserBackButtonItem, *browserForwardButtonItem, *browserRefreshButtonItem, *browserStopButtonItem, *browserFixedSeparator, *browserFlexibleSeparator;
+@property(nonatomic, strong) UIBarButtonItem *browserBackButtonItem, *browserForwardButtonItem, *browserRefreshButtonItem,
+        *browserStopButtonItem, *browserFixedSeparator1, *browserFixedSeparator2, *browserActionButton,
+        *browserFlexibleSeparator1,*browserFlexibleSeparator2;
 @property (nonatomic, strong) WKWebView *wkWebView;
 @property (nonatomic, strong) UIWebView *uiWebView;
 @property (nonatomic, readonly) UIView <KINWebBrowserView> *webView;
@@ -146,7 +163,7 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
 + (UINavigationController *)navigationControllerWithWebBrowser;
 + (UINavigationController *)navigationControllerWithWebBrowserWithConfiguration:(WKWebViewConfiguration *)configuration NS_AVAILABLE_IOS(8_0);
 
-@property (nonatomic, strong) UIBarButtonItem *actionButton;
+@property (nonatomic, strong) UIBarButtonItem *actionButton __deprecated_msg("Use browserActionButton instead.");
 @property (nonatomic, strong) UIColor *tintColor;
 @property (nonatomic, strong) UIColor *barTintColor;
 @property (nonatomic, assign) BOOL actionButtonHidden;

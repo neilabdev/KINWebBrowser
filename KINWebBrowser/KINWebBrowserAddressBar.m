@@ -99,7 +99,7 @@ typedef NS_ENUM(NSInteger, KINAddressBarState) {
 
 
         self.addressFieldItem = [[UIBarButtonItem alloc] initWithCustomView:addressField];
-        // [self.actionButton se]
+        // [self.browserActionButton se]
         addressField.rightViewMode = UITextFieldViewModeAlways;
         addressField.leftViewMode = UITextFieldViewModeAlways;
         addressField.rightView = self.actionButton;
@@ -250,10 +250,10 @@ typedef NS_ENUM(NSInteger, KINAddressBarState) {
 
     if (status & KINAddressBarStatusCanRefresh) {
         actionState = KINAddressBarStateLoaded;
-        //[self.actionButton setImage:self.refreshActionImage forState:UIControlStateNormal];
+        //[self.browserActionButton setImage:self.refreshActionImage forState:UIControlStateNormal];
     } else if (status & KINAddressBarStatusCanCancel) {
         actionState = KINAddressBarStateLoading;
-        //[self.actionButton setImage:self.cancelActionImage forState:UIControlStateNormal];
+        //[self.browserActionButton setImage:self.cancelActionImage forState:UIControlStateNormal];
     } else {
         NSLog(@"Unknown state");
     }

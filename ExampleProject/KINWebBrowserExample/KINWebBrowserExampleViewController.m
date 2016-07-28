@@ -35,7 +35,8 @@
 
 
 @interface KINWebBrowserExampleViewController ()
-
+@property (nonatomic,retain) NSMutableArray *bottomToolbarItems;
+@property (nonatomic,retain)UIBarButtonItem *browserTakeShopshotButton;
 @end
 
 static NSString *const defaultAddress = @"https://www.apple.com";
@@ -57,20 +58,46 @@ static NSString *const defaultAddress = @"https://www.apple.com";
     // Do any additional setup after loading the view from its nib.
     
     self.navigationItem.title = @"";
-    
     [self.navigationController setToolbarHidden:YES];
     [self.navigationController setNavigationBarHidden:YES];
-    
     self.navigationController.navigationBar.translucent = YES;
     self.navigationController.toolbar.translucent = YES;
-    
+
+    self.browserTakeShopshotButton  =
+            [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCamera target:self
+                                                          action:@selector(takeSnapshot:)];
 
 }
 
-- (void)didReceiveMemoryWarning
-{
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
+- (void) takeSnapshot:(id) sender {
+    NSLog(@"take snapshot");
+}
+
+- (NSArray *)webBrowser:(KINWebBrowserViewController *)webBrowser toolbarItems:(NSArray *)items {
+
+    if(webBrowser.isLoading) {
+        return @[
+                items[KINBrowserToolbarButtonIndexBack],
+                items[KINBrowserToolbarButtonIndexFixedSeparator1],
+                items[KINBrowserToolbarButtonIndexForward],
+                items[KINBrowserToolbarButtonIndexFixedSeparator2],
+                items[KINBrowserToolbarButtonIndexStop],
+                items[KINBrowserToolbarButtonIndexFlexibleSeparator1],
+                self.browserTakeShopshotButton,
+                webBrowser.browserActionButton
+        ];
+    } else {
+        return @[
+                items[KINBrowserToolbarButtonIndexBack],
+                items[KINBrowserToolbarButtonIndexFixedSeparator1],
+                items[KINBrowserToolbarButtonIndexForward],
+                items[KINBrowserToolbarButtonIndexFixedSeparator2],
+                items[KINBrowserToolbarButtonIndexRefresh],
+                items[KINBrowserToolbarButtonIndexFlexibleSeparator1],
+                self.browserTakeShopshotButton,
+                webBrowser.browserActionButton
+        ];
+    }
 }
 
 #pragma mark - KINWebBrowserDelegate Protocol Implementation
