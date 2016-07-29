@@ -114,6 +114,15 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 @property (nonatomic,retain) NSLayoutConstraint *browserViewBottomConstraint;
 @property (nonatomic,retain) NSLayoutConstraint *browserViewHeightConstraint;
 
+@property (nonatomic,copy) KINBrowserSnapshotProgressBlock snapshotProgressBlock;
+@property (nonatomic,copy) KINBrowserSnapshotCompletedBlock snapshotCompletedBlock;
+
+/*
+ *    progress: (KINBrowserSnapshotProgressBlock) progress
+                           completed: (KINBrowserSnapshotCompletedBlock) completedBlock {
+ */
+
+
 - (NSArray*) loadWebBrowserToolbarItems;
 @end
 
@@ -1159,6 +1168,40 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 - (BOOL)shouldAutorotate {
     return YES;
+}
+
+#pragma mark - Snapshot
+
+-(void) performScreenshotWithOptions: (KINBrowserSnapshotOption) option
+                            progress: (KINBrowserSnapshotProgressBlock) progress
+                           completed: (KINBrowserSnapshotCompletedBlock) completedBlock {
+
+    //[self enableSnapshot:YES];
+
+
+    self.snapshotProgressBlock = progress;
+    self.snapshotCompletedBlock = completedBlock;
+
+    [self performSelector:@selector(finishSnapshot) withObject:nil afterDelay:0];
+
+}
+
+
+- (void) finishSnapshot {
+    @autoreleasepool {
+        UIGraphicsBeginImageContextWithOptions(self.webView.frame.size,true,0);
+     //   self.webView.layer.displayIfNeeded();
+        [self.webView drawViewHierarchyInRect:CGRectMake(0,0,self.webView.frame.size.width,self.webView.frame.size.height) afterScreenUpdates:YES];
+
+        UIImage *image =   UIGraphicsGetImageFromCurrentImageContext();
+        if(self.snapshotCompletedBlock)
+            self.snapshotCompletedBlock (image,nil,image!=nil);
+    }
+
+
+  //  [self enableSnapshot:NO];
+    self.snapshotCompletedBlock = nil;
+    self.snapshotProgressBlock = nil;
 }
 
 #pragma mark - Dealloc

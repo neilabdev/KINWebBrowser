@@ -74,8 +74,8 @@ static NSString *const defaultAddress =  @"http://blogs.spectator.co.uk/2016/07/
 
 - (void) takeSnapshot:(id) sender {
     NSLog(@"take snapshot");
-    self.snapshotEnabled = !self.snapshotEnabled;
-    [self.webBrowser enableSnapshot:self.snapshotEnabled];
+ //   self.snapshotEnabled = !self.snapshotEnabled;
+ //   [self.webBrowser enableSnapshot:self.snapshotEnabled];
 
     KINSnapshotExampleViewController *snapshotExampleViewController =
             [[KINSnapshotExampleViewController alloc] initWithBrowser:self.webBrowser];

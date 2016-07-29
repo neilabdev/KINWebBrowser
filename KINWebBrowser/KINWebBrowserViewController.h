@@ -85,9 +85,6 @@ typedef NS_ENUM(NSInteger,KINBrowserNavigationType) {
 };
 
 typedef NS_ENUM(NSInteger,KINBrowserToolbarButtonIndex) {
-    // @[self.browserBackButtonItem=0, self.browserFixedSeparator1=1, self.browserForwardButtonItem=2,
-    // self.browserFixedSeparator2=3, (self.browserStopButtonItem | refresh)=4, self.browserFlexibleSeparator1=5];
-
     KINBrowserToolbarButtonIndexBack=0,
     KINBrowserToolbarButtonIndexFixedSeparator1=1,
     KINBrowserToolbarButtonIndexForward=2,
@@ -97,6 +94,21 @@ typedef NS_ENUM(NSInteger,KINBrowserToolbarButtonIndex) {
     KINBrowserToolbarButtonIndexFlexibleSeparator1=5,
     KINBrowserToolbarButtonIndexAction=6
 };
+
+/*
+typedef NS_OPTIONS(NSInteger,KINBrowserSnapshotOptions) {
+    KINBrowserSnapshotOptionProgressive,
+    KINBrowserSnapshotOptionSingle
+}; */
+
+typedef NS_ENUM(NSInteger,KINBrowserSnapshotOption) {
+    KINBrowserSnapshotOptionProgressive,
+    KINBrowserSnapshotOptionSingle
+};
+
+typedef void(^KINBrowserSnapshotProgressBlock)(NSInteger receivedSize, NSInteger expectedSize);
+typedef void(^KINBrowserSnapshotCompletedBlock)(UIImage *image, NSError *error, BOOL finished);
+
 
 @protocol KINWebBrowserDelegate <NSObject>
 @optional
@@ -199,5 +211,10 @@ typedef NS_ENUM(NSInteger,KINBrowserToolbarButtonIndex) {
 - (void)stopLoading;
 - (void)goForward;
 - (void)goBack;
+
+-(void) performScreenshotWithOptions: (KINBrowserSnapshotOption) option
+                            progress: (KINBrowserSnapshotProgressBlock) progress
+                           completed: (KINBrowserSnapshotCompletedBlock) completedBlock;
+
 @end
 
