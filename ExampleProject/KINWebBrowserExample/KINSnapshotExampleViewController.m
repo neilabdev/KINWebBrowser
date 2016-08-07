@@ -26,6 +26,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.automaticallyAdjustsScrollViewInsets = NO;
+    self.view.opaque = NO;
     self.scrollView = [[UIScrollView alloc] initWithFrame:self.view.bounds];
     self.scrollView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.imageView = [[UIImageView alloc] initWithFrame:self.view.bounds];
@@ -36,7 +37,7 @@
 
     [self.scrollView addSubview:self.imageView];
     [self.view addSubview:self.scrollView];
-    [self.browser performScreenshotWithOptions:KINBrowserSnapshotOptionProgressive  progress:^(NSInteger receivedSize, NSInteger expectedSize) {
+    [self.browser performScreenshotWithOptions:KINBrowserSnapshotOptionProgressive  progress:^(KINWebBrowserSnapshotProgress * progress)  {
 
     } completed:^(UIImage *image, NSError *error, BOOL finished) {
         if(finished) {

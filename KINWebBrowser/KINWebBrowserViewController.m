@@ -34,6 +34,82 @@
 #import "TUSafariActivity.h"
 #import "ARChromeActivity.h"
 
+
+//typedef void(^KINSnapshotWorkBlock)(void);
+
+@interface KINSnapshotOperation : NSOperation
+@property(copy, nullable) void (^workBlock)(void);
+@end
+
+@implementation KINSnapshotOperation {
+    BOOL _work_done;
+}
+- (void)main {
+    if (self.workBlock)
+        self.workBlock();
+
+    [self willChangeValueForKey:@"isFinished"];
+    _work_done = YES;
+    [self didChangeValueForKey:@"isFinished"];
+
+
+}
+
+- (BOOL)isFinished {
+    return _work_done;
+}
+@end
+
+#pragma mark - KINWebBrowserSnapshotProgress
+
+@interface KINWebBrowserSnapshotProgress () {
+    NSInteger _index;
+    NSInteger _pages;
+    BOOL _cancelled;
+}
+@property(nonatomic, assign) CGRect initialWebViewFrame;
+@property(nonatomic, assign) CGSize initialContentSize;
+@property(nonatomic, assign) CGPoint initialContentOffset;
+@property(nonatomic, assign) CGFloat snapshotHeight;
+@property(nonatomic, copy) KINBrowserSnapshotProgressBlock progressBlock;
+@property(nonatomic, copy) KINBrowserSnapshotCompletedBlock completedBlock;
+@property(nonatomic, getter=pages, setter=setTotalPages:) NSInteger total_pages;
+@property(nonatomic, getter=index, setter=setCurrentIndex:) NSInteger current_index;
+@end
+
+@implementation KINWebBrowserSnapshotProgress
+
+- (void)setCurrentIndex:(NSInteger)i {
+    _index = i;
+}
+
+- (void)setTotalPages:(NSInteger)i {
+    _pages = i;
+}
+
+- (NSInteger)index {
+    return _index;
+}
+
+- (NSInteger)pages {
+    return _pages;
+}
+
+- (BOOL)cancelled {
+    return _cancelled;
+}
+
+- (void)cancel {
+    _cancelled = YES;
+    NSError *error =
+            [NSError errorWithDomain:@"KINWebBrowser" code:100 userInfo:@{@"message" : @"snapshot was cancelled"}];
+    if (self.completedBlock)
+        self.completedBlock(nil, error, NO);
+}
+@end
+
+#pragma mark - UIWebView (KINWebBrowserWebViewMethods)
+
 @implementation UIWebView (KINWebBrowserWebViewMethods)
 - (NSURL *)URL {
     return self.request.URL;
@@ -105,17 +181,14 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 @property(nonatomic, strong) WKWebViewConfiguration *configuration;
 @property(nonatomic, strong) NSMutableDictionary *requestBalance;
 @property(nonatomic, strong) NSMutableDictionary *loadedURLS;
-@property (nonatomic,strong) NSArray *defaultBrowserToolbarItems;
-@property (nonatomic,assign) BOOL configuredAutolayout;
-@property (nonatomic,retain) NSMutableArray *progressViewConstraints;
-@property (nonatomic,retain) NSMutableArray *webViewConstraints;
-@property (nonatomic,retain) NSMutableArray *headerViewConstraints;
+@property(nonatomic, strong) NSArray *defaultBrowserToolbarItems;
+@property(nonatomic, assign) BOOL configuredAutolayout;
+@property(nonatomic, retain) NSMutableArray *progressViewConstraints;
+@property(nonatomic, retain) NSMutableArray *webViewConstraints;
+@property(nonatomic, retain) NSMutableArray *headerViewConstraints;
 
-@property (nonatomic,retain) NSLayoutConstraint *browserViewBottomConstraint;
-@property (nonatomic,retain) NSLayoutConstraint *browserViewHeightConstraint;
-
-@property (nonatomic,copy) KINBrowserSnapshotProgressBlock snapshotProgressBlock;
-@property (nonatomic,copy) KINBrowserSnapshotCompletedBlock snapshotCompletedBlock;
+@property(nonatomic, retain) NSLayoutConstraint *browserViewBottomConstraint;
+@property(nonatomic, retain) NSLayoutConstraint *browserViewHeightConstraint;
 
 /*
  *    progress: (KINBrowserSnapshotProgressBlock) progress
@@ -123,7 +196,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
  */
 
 
-- (NSArray*) loadWebBrowserToolbarItems;
+- (NSArray *)loadWebBrowserToolbarItems;
 @end
 
 
@@ -171,7 +244,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 }
 
 #pragma mark - Initializers
-- (void) setup {
+
+- (void)setup {
     [self setupToolbarItems];
     self.requestBalance = [NSMutableDictionary dictionary];
     self.loadedURLS = [NSMutableDictionary dictionary];
@@ -190,18 +264,19 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     _isActiveBrowser = NO;
 }
 
-- (void) setupWebView {
-    if(self.wkWebView || self.uiWebView)
+- (void)setupWebView {
+    if (self.wkWebView || self.uiWebView)
         return;
     NSString *version = [UIDevice currentDevice].systemVersion;
 
-    if([version floatValue]< 8.0f || // note: Defaults to WKWebview if no browserClass is specified, unless < ver 8.0
+    if ([version floatValue] < 8.0f || // note: Defaults to WKWebview if no browserClass is specified, unless < ver 8.0
             (self.browserViewClass && self.browserViewClass == [UIWebView class])) {
         self.uiWebView = [[UIWebView alloc] init];
-    }  else {
+    } else {
         self.wkWebView = [[WKWebView alloc] init];
     }
 }
+
 - (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
     if (self = [super initWithNibName:nil bundle:nil]) {
         [self setup];
@@ -226,7 +301,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
     self.previousNavigationControllerToolbarHidden = self.navigationController.toolbarHidden;
     self.previousNavigationControllerNavigationBarHidden = self.navigationController.navigationBarHidden;
-    self.automaticallyAdjustsScrollViewInsets=NO;
+    self.automaticallyAdjustsScrollViewInsets = NO;
     if (self.wkWebView) {
         [self.wkWebView setFrame:self.view.bounds];
         [self.wkWebView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
@@ -256,7 +331,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     [self.view setNeedsUpdateConstraints];
 }
 
-- (void) resetViewConstraints {
+- (void)resetViewConstraints {
     self.configuredAutolayout = NO;
     [self.view setNeedsUpdateConstraints];
 }
@@ -265,20 +340,19 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     [super updateViewConstraints];
 
 
-
-    if(!self.configuredAutolayout) {
+    if (!self.configuredAutolayout) {
         UIView *topView = self.progressView;
 
-        if([self.progressViewConstraints count]>0) {
+        if ([self.progressViewConstraints count] > 0) {
             [self.view removeConstraints:self.progressViewConstraints];
             [self.progressViewConstraints removeAllObjects];
         }
 
-        if([self.webViewConstraints count]>0) {
+        if ([self.webViewConstraints count] > 0) {
             [self.view removeConstraints:self.webViewConstraints];
             [self.webViewConstraints removeAllObjects];
         }
-        if([self.headerViewConstraints count]>0){
+        if ([self.headerViewConstraints count] > 0) {
             [self.view removeConstraints:self.headerViewConstraints];
             [self.headerViewConstraints removeAllObjects];
         }
@@ -287,10 +361,10 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
         NSLayoutConstraint *progressViewRightConstraint =
                 [NSLayoutConstraint constraintWithItem:self.progressView
-                                     attribute:NSLayoutAttributeRight
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.view
-                                     attribute:NSLayoutAttributeRight multiplier:1 constant:0];
+                                             attribute:NSLayoutAttributeRight
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.view
+                                             attribute:NSLayoutAttributeRight multiplier:1 constant:0];
         NSLayoutConstraint *progressViewLeftConstraint =
                 [NSLayoutConstraint constraintWithItem:self.progressView
                                              attribute:NSLayoutAttributeLeft
@@ -299,10 +373,10 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                                              attribute:NSLayoutAttributeLeft multiplier:1 constant:0];
         NSLayoutConstraint *progressViewTopConstraint =
                 [NSLayoutConstraint constraintWithItem:self.progressView
-                                     attribute:NSLayoutAttributeTop
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.topLayoutGuide
-                                     attribute:NSLayoutAttributeBottom multiplier:1 constant:0];
+                                             attribute:NSLayoutAttributeTop
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.topLayoutGuide
+                                             attribute:NSLayoutAttributeBottom multiplier:1 constant:0];
         NSLayoutConstraint *progressViewWidthConstraint =
                 [NSLayoutConstraint constraintWithItem:self.progressView
                                              attribute:NSLayoutAttributeWidth
@@ -319,7 +393,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         ];
         [self.view addConstraints:self.progressViewConstraints];
 
-        if(self.browserHeaderView) {
+        if (self.browserHeaderView) {
             topView = self.browserHeaderView;
             self.browserHeaderView.translatesAutoresizingMaskIntoConstraints = NO;
             NSLayoutConstraint *headerViewRightConstraint =
@@ -343,7 +417,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                                                     toItem:self.view
                                                  attribute:NSLayoutAttributeWidth multiplier:1 constant:0];
             [self.headerViewConstraints addObjectsFromArray:
-                    @[headerViewRightConstraint, headerViewTopConstraint,headerViewWidthConstraint]
+                    @[headerViewRightConstraint, headerViewTopConstraint, headerViewWidthConstraint]
             ];
 
             [self.view addConstraints:self.headerViewConstraints];
@@ -379,22 +453,23 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
         self.browserViewBottomConstraint.priority = UILayoutPriorityDefaultHigh;
 
-        CGSize webViewContentSize =  self.webView.scrollView.contentSize;
+        CGSize webViewContentSize = self.webView.scrollView.contentSize;
 
         self.browserViewHeightConstraint =
                 [NSLayoutConstraint constraintWithItem:self.webView
                                              attribute:NSLayoutAttributeHeight
                                              relatedBy:NSLayoutRelationEqual
                                                 toItem:nil
-                                             attribute:NSLayoutAttributeNotAnAttribute  multiplier:1 constant:webViewContentSize.height];
+                                             attribute:NSLayoutAttributeNotAnAttribute multiplier:1 constant:webViewContentSize.height];
 
-       self.browserViewHeightConstraint.priority = UILayoutPriorityDefaultLow;
+        self.browserViewHeightConstraint.priority = UILayoutPriorityDefaultLow;
         //browserViewHeightConstraint.active
 
         self.webView.translatesAutoresizingMaskIntoConstraints = NO;
 
         [self.webViewConstraints addObjectsFromArray:
-                @[browserViewRightConstraint,browserViewTopConstraint,browserViewWidthConstraint,self.browserViewBottomConstraint,self.browserViewHeightConstraint] //browserViewHeightConstraint
+                @[browserViewRightConstraint, browserViewTopConstraint, browserViewWidthConstraint,
+                        self.browserViewBottomConstraint, self.browserViewHeightConstraint] //browserViewHeightConstraint
         ];
 
         [self.view addConstraints:self.webViewConstraints];
@@ -402,9 +477,9 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     }
 }
 
-- (void) enableSnapshot:(BOOL) truth {
+- (void)enableSnapshot:(BOOL)truth {
 
-    if(truth) {
+    if (truth) {
         self.browserViewBottomConstraint.active = NO;
         self.browserViewHeightConstraint.constant = self.webView.scrollView.contentSize.height;
 
@@ -427,18 +502,18 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
     if (!self.hidesBottomBarWhenPushed)
         [self.navigationController setToolbarHidden:NO animated:YES];
-  //  [self.navigationController.navigationBar addSubview:self.progressView]; //todo: perhaps make visiable?
+    //  [self.navigationController.navigationBar addSubview:self.progressView]; //todo: perhaps make visiable?
     [self updateToolbarState];
 }
 
-- (NSArray*) loadWebBrowserToolbarItems {
+- (NSArray *)loadWebBrowserToolbarItems {
 
-    if([self.delegate conformsToProtocol:@protocol(KINWebBrowserDelegate)] &&
+    if ([self.delegate conformsToProtocol:@protocol(KINWebBrowserDelegate)] &&
             [self.delegate respondsToSelector:@selector(webBrowser:toolbarItems:)]) {
         return [self.delegate webBrowser:self toolbarItems:self.defaultBrowserToolbarItems];
     }
 
-    if([self.delegate conformsToProtocol:@protocol(KINWebBrowserDelegate)] &&
+    if ([self.delegate conformsToProtocol:@protocol(KINWebBrowserDelegate)] &&
             [self.delegate respondsToSelector:@selector(webBrowserToolbarItems)]) {
         return [self.delegate webBrowserToolbarItems];
     }
@@ -453,7 +528,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     [self.navigationController setToolbarHidden:self.previousNavigationControllerToolbarHidden animated:animated];
     [self stopLoading]; // no need to continue loading if will become invisible. Hopefully deleages are called bore they are assigned nill
 }
-
 
 
 - (void)setBrowserHeaderView:(UIView *)browserHeaderView {
@@ -770,7 +844,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     }
 }
 
-- (void)webView:(WKWebView * _Nonnull)webView didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge * _Nonnull)challenge completionHandler:(void (^ _Nonnull)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential * _Nullable credential))completionHandler {
+- (void)webView:(WKWebView *_Nonnull)webView didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *_Nonnull)challenge completionHandler:(void (^ _Nonnull)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *_Nullable credential))completionHandler {
 //NSURLSessionAuthChallengeUseCredential
     NSString *url = webView.URL.absoluteString;
     NSURLCredential *cred = [[NSURLCredential alloc] initWithTrust:challenge.protectionSpace.serverTrust];
@@ -891,7 +965,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void)updateToolbarState {
     KINAddressBarStatus addressBarStatues = KINAddressBarStatusNone;
     BOOL canGoBack = self.webView.canGoBack;
-    BOOL canGoForward =  self.webView.canGoForward;
+    BOOL canGoForward = self.webView.canGoForward;
 
     if (canGoBack)
         addressBarStatues |= KINAddressBarStatusCanGoBack;
@@ -906,7 +980,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     [self.browserBackButtonItem setEnabled:canGoBack];
     [self.browserForwardButtonItem setEnabled:canGoForward];
 
-  //  NSArray *barButtonItems;
+    //  NSArray *barButtonItems;
     if (self.isLoading) {
         self.defaultBrowserToolbarItems = @[self.browserBackButtonItem, self.browserFixedSeparator1, self.browserForwardButtonItem, self.browserFixedSeparator2, self.browserStopButtonItem, self.browserFlexibleSeparator1];
 
@@ -918,7 +992,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
             self.navigationItem.title = URLString;
         }
     } else {
-        self.defaultBrowserToolbarItems  = @[self.browserBackButtonItem, self.browserFixedSeparator1, self.browserForwardButtonItem, self.browserFixedSeparator2, self.browserRefreshButtonItem, self.browserFlexibleSeparator1];
+        self.defaultBrowserToolbarItems = @[self.browserBackButtonItem, self.browserFixedSeparator1, self.browserForwardButtonItem, self.browserFixedSeparator2, self.browserRefreshButtonItem, self.browserFlexibleSeparator1];
 
         if (self.showsPageTitleInNavigationBar) {
             if (self.wkWebView) {
@@ -932,12 +1006,12 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     if (!self.actionButtonHidden) {
         NSMutableArray *mutableBarButtonItems = [NSMutableArray arrayWithArray:self.defaultBrowserToolbarItems];
         [mutableBarButtonItems addObject:self.browserActionButton];
-        self.defaultBrowserToolbarItems  = mutableBarButtonItems;
+        self.defaultBrowserToolbarItems = mutableBarButtonItems;
     }
 
-    NSArray* barButtonItems = [self loadWebBrowserToolbarItems];
+    NSArray *barButtonItems = [self loadWebBrowserToolbarItems];
 
-    if(barButtonItems)
+    if (barButtonItems)
         [self setToolbarItems:barButtonItems animated:YES];
 
     self.tintColor = self.tintColor;
@@ -1172,36 +1246,154 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 #pragma mark - Snapshot
 
--(void) performScreenshotWithOptions: (KINBrowserSnapshotOption) option
-                            progress: (KINBrowserSnapshotProgressBlock) progress
-                           completed: (KINBrowserSnapshotCompletedBlock) completedBlock {
+- (void)performScreenshotWithOptions:(KINBrowserSnapshotOption)option
+                            progress:(KINBrowserSnapshotProgressBlock)progressBlock
+                           completed:(KINBrowserSnapshotCompletedBlock)completedBlock {
+    NSOperationQueue *mainQueue = [NSOperationQueue new]; // [NSOperationQueue mainQueue];
+    KINWebBrowserSnapshotProgress *progress = [KINWebBrowserSnapshotProgress new];
+    NSTimeInterval snapshotDelay = 0.5;
+    NSInteger remainder = 0;
 
-    //[self enableSnapshot:YES];
+    mainQueue.maxConcurrentOperationCount = 1;
+    progress.progressBlock = progressBlock;
+    progress.completedBlock = completedBlock;
+    progress.initialContentSize = self.webView.scrollView.contentSize;
+    progress.initialContentOffset = self.webView.scrollView.contentOffset;
+    progress.initialWebViewFrame = self.webView.frame;
 
+    remainder = (int) progress.initialContentSize.height % (int) progress.initialWebViewFrame.size.height;
+    progress.total_pages =
+            (int) progress.initialContentSize.height / (int) progress.initialWebViewFrame.size.height + (remainder > 0 ? 1 : 0);
+    progress.current_index = 0;
+    progress.snapshotHeight = progress.pages * progress.initialWebViewFrame.size.height;
 
-    self.snapshotProgressBlock = progress;
-    self.snapshotCompletedBlock = completedBlock;
+    if (option == KINBrowserSnapshotOptionProgressive) {
+        NSOperation *lastOperation = nil;
+        NSMutableArray <NSOperation * > *operations = [NSMutableArray array];
+        KINSnapshotOperation *firstOperation = [KINSnapshotOperation new];
+        firstOperation.workBlock = ^{
+            NSLog(@"-performScreenshotWithOptions: first %d", progress.index);
+            [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+                self.webView.scrollView.contentSize = CGSizeMake(0, progress.snapshotHeight * 2);
+                self.webView.scrollView.contentOffset = CGPointZero;
+                self.browserViewBottomConstraint.active = NO;
+                self.browserViewHeightConstraint.constant = progress.snapshotHeight;
+                [self.webView setNeedsDisplay];
+                NSLog(@"+performScreenshotWithOptions: first %d", progress.index);
+            }];
+            [NSThread sleepForTimeInterval:snapshotDelay];
+        };
 
-    [self performSelector:@selector(finishSnapshot) withObject:nil afterDelay:0];
+        [mainQueue addOperation:firstOperation];
+        [operations addObject:firstOperation];
+
+        for (int i = 0, l = progress.pages; i < l; i++) {
+            KINSnapshotOperation *operation = [KINSnapshotOperation new];
+            operation.workBlock = ^{
+                if (progress.cancelled) {
+                    [mainQueue cancelAllOperations];
+                    [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+                        [self restoreWebBrowser:progress];
+                      //  NSLog(@"+performScreenshotWithOptions: finish: %d", progress.index);
+                    }];
+                    return;
+                }
+
+                [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+                    NSInteger next_page = progress.index + 1;
+                    CGPoint nextScrollPosition = CGPointMake(0, progress.index * progress.initialWebViewFrame.size.height);
+                    progress.current_index = next_page;
+                    self.webView.scrollView.contentOffset = nextScrollPosition;
+                    [self.webView.scrollView setContentOffset:nextScrollPosition animated:YES];
+                    [self.webView setNeedsDisplay];
+
+                    if(progress.progressBlock)
+                        progress.progressBlock(progress);
+                    NSLog(@"+performScreenshotWithOptions: snap %d / %d", progress.index, i);
+                }];
+                //   NSLog(@"?sleep:performScreenshotWithOptions: done %d / %d",progress.index, i);
+                [NSThread sleepForTimeInterval:snapshotDelay];
+
+                [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+                    [self finishVisableSnapshot:progress];
+                }];
+
+              //  progress.p
+            };
+
+            [operation addDependency:lastOperation ? lastOperation : firstOperation];
+            [operations addObject:operation];
+            [mainQueue addOperation:operation];
+            lastOperation = operation;
+        }
+
+        KINSnapshotOperation *finishOperation = [KINSnapshotOperation new];
+        finishOperation.workBlock = ^{
+            NSLog(@"-performScreenshotWithOptions: finish: %d", progress.index);
+            [NSThread sleepForTimeInterval:snapshotDelay];
+            [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+                [self restoreWebBrowser:progress];
+                NSLog(@"+performScreenshotWithOptions: finish: %d", progress.index);
+            }];
+        };
+
+        [finishOperation addDependency:[operations lastObject]];
+        [mainQueue addOperation:finishOperation];
+    } else {
+        // [self performSelector:@selector(finishVisableSnapshot) withObject:nil afterDelay:0];
+        [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+            if (progress.cancelled)
+                return;
+            [self finishVisableSnapshot:progress];
+        }];
+
+    }
+}
+
+- (void)beginProgressiveSnapshot {
+    CGSize initialContentSize = self.webView.scrollView.contentSize;
+    CGRect initialWebViewFrame = self.webView.frame;
+    NSInteger remainder = (int) initialContentSize.height % (int) initialWebViewFrame.size.height;
 
 }
 
-
-- (void) finishSnapshot {
+- (void) restoreWebBrowser:(KINWebBrowserSnapshotProgress *)progress {
+    self.webView.scrollView.contentSize = progress.initialContentSize;
+    self.webView.scrollView.contentOffset = progress.initialContentOffset;
+    self.browserViewBottomConstraint.active = YES;
+    ////   [self.view addConstraint: self.browserViewBottomConstraint];
+    self.browserViewHeightConstraint.constant = progress.initialWebViewFrame.size.height;
+    [self.webView setNeedsDisplay];
+}
+- (void)finishVisableSnapshot:(KINWebBrowserSnapshotProgress *)progress {
     @autoreleasepool {
-        UIGraphicsBeginImageContextWithOptions(self.webView.frame.size,true,0);
-     //   self.webView.layer.displayIfNeeded();
-        [self.webView drawViewHierarchyInRect:CGRectMake(0,0,self.webView.frame.size.width,self.webView.frame.size.height) afterScreenUpdates:YES];
+         CGRect drawRect = CGRectMake(0,0,progress.initialWebViewFrame.size.width,progress.initialWebViewFrame.size.height);
+        //CGRect drawRect = CGRectMake(progress.initialWebViewFrame.origin.x,progress.initialWebViewFrame.origin.y,progress.initialWebViewFrame.size.width,progress.initialWebViewFrame.size.height);
 
-        UIImage *image =   UIGraphicsGetImageFromCurrentImageContext();
-        if(self.snapshotCompletedBlock)
-            self.snapshotCompletedBlock (image,nil,image!=nil);
+        UIGraphicsBeginImageContextWithOptions(progress.initialWebViewFrame.size, true,0.0);// [UIScreen mainScreen].scale
+        [self.view drawViewHierarchyInRect:drawRect afterScreenUpdates:YES];
+        UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+
+        if(image) {
+            NSError *error;
+            NSData *imageData = UIImagePNGRepresentation(image);
+            NSString *imageName = [NSString stringWithFormat:@"snapshot_%d.png",progress.index];
+            NSURL *imageDir = [NSURL fileURLWithPath: NSTemporaryDirectory() ];
+            NSURL *fullPathURL = [imageDir URLByAppendingPathComponent:imageName];
+            [[NSFileManager defaultManager] createDirectoryAtURL:imageDir
+                                     withIntermediateDirectories:YES attributes:@{} error:&error];
+            BOOL success = [imageData writeToURL:fullPathURL atomically:YES];
+
+            if(success) {
+                NSLog(@"+logging file to: %@",fullPathURL);
+
+            } else
+                NSLog(@"-logging file to: %@",fullPathURL);
+        }
+
+        if (progress.completedBlock)
+            progress.completedBlock(image, nil, image != nil);
     }
-
-
-  //  [self enableSnapshot:NO];
-    self.snapshotCompletedBlock = nil;
-    self.snapshotProgressBlock = nil;
 }
 
 #pragma mark - Dealloc

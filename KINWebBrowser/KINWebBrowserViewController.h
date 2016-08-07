@@ -103,10 +103,18 @@ typedef NS_OPTIONS(NSInteger,KINBrowserSnapshotOptions) {
 
 typedef NS_ENUM(NSInteger,KINBrowserSnapshotOption) {
     KINBrowserSnapshotOptionProgressive,
-    KINBrowserSnapshotOptionSingle
+    KINBrowserSnapshotOptionVisible
 };
 
-typedef void(^KINBrowserSnapshotProgressBlock)(NSInteger receivedSize, NSInteger expectedSize);
+
+@interface KINWebBrowserSnapshotProgress : NSObject
+@property (nonatomic, readonly) NSInteger index;
+@property (nonatomic, readonly) NSInteger pages;
+@property (nonatomic, readonly) BOOL cancelled;
+- (void) cancel;
+@end
+
+typedef void(^KINBrowserSnapshotProgressBlock)(KINWebBrowserSnapshotProgress *progress);
 typedef void(^KINBrowserSnapshotCompletedBlock)(UIImage *image, NSError *error, BOOL finished);
 
 
