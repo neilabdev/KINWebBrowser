@@ -1260,6 +1260,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     progress.initialContentSize = self.webView.scrollView.contentSize;
     progress.initialContentOffset = self.webView.scrollView.contentOffset;
     progress.initialWebViewFrame = self.webView.frame;
+    progress.initialScrollEnabled = self.webView.scrollView.scrollEnabled;
+    progress.initialUserInteractionEnabled = self.webView.userInteractionEnabled ;
 
     remainder = (int) progress.initialContentSize.height % (int) progress.initialWebViewFrame.size.height;
     progress.total_pages =
@@ -1278,6 +1280,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                 self.webView.scrollView.contentOffset = CGPointZero;
                 self.browserViewBottomConstraint.active = NO;
                 self.browserViewHeightConstraint.constant = progress.snapshotHeight;
+                self.webView.scrollView.scrollEnabled = NO;
+                self.webView.userInteractionEnabled = NO;
                 [self.webView setNeedsDisplay];
                 NSLog(@"+performScreenshotWithOptions: first %d", progress.index);
             }];
@@ -1360,6 +1364,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void) restoreWebBrowser:(KINWebBrowserSnapshotProgress *)progress {
     self.webView.scrollView.contentSize = progress.initialContentSize;
     self.webView.scrollView.contentOffset = progress.initialContentOffset;
+    self.webView.scrollView.scrollEnabled = progress.initialScrollEnabled;
+    self.webView.userInteractionEnabled = progress.initialUserInteractionEnabled;
     self.browserViewBottomConstraint.active = YES;
     ////   [self.view addConstraint: self.browserViewBottomConstraint];
     self.browserViewHeightConstraint.constant = progress.initialWebViewFrame.size.height;
@@ -1371,7 +1377,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         //CGRect drawRect = CGRectMake(progress.initialWebViewFrame.origin.x,progress.initialWebViewFrame.origin.y,progress.initialWebViewFrame.size.width,progress.initialWebViewFrame.size.height);
 
         UIGraphicsBeginImageContextWithOptions(progress.initialWebViewFrame.size, true,0.0);// [UIScreen mainScreen].scale
-        [self.view drawViewHierarchyInRect:drawRect afterScreenUpdates:YES];
+    //    [self.webView drawViewHierarchyInRect:drawRect afterScreenUpdates:YES];
+        [self.webView.layer renderInContext:UIGraphicsGetCurrentContext()];
         UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
 
         if(image) {

@@ -111,6 +111,9 @@ typedef NS_ENUM(NSInteger,KINBrowserSnapshotOption) {
 @property (nonatomic, readonly) NSInteger index;
 @property (nonatomic, readonly) NSInteger pages;
 @property (nonatomic, readonly) BOOL cancelled;
+@property (nonatomic, assign) BOOL initialUserInteractionEnabled;
+@property (nonatomic, assign) BOOL initialScrollEnabled;
+
 - (void) cancel;
 @end
 
