@@ -51,8 +51,6 @@
     [self willChangeValueForKey:@"isFinished"];
     _work_done = YES;
     [self didChangeValueForKey:@"isFinished"];
-
-
 }
 
 - (BOOL)isFinished {
@@ -60,12 +58,13 @@
 }
 @end
 
-#pragma mark - KINWebBrowserSnapshotProgress
+#pragma mark - KINWebBrowserSnapshotContext
 
-@interface KINWebBrowserSnapshotProgress () {
+@interface KINWebBrowserSnapshotContext () {
     NSInteger _index;
     NSInteger _pages;
     BOOL _cancelled;
+    NSMutableArray *_snapshots;
 }
 @property(nonatomic, assign) CGRect initialWebViewFrame;
 @property(nonatomic, assign) CGSize initialContentSize;
@@ -77,7 +76,36 @@
 @property(nonatomic, getter=index, setter=setCurrentIndex:) NSInteger current_index;
 @end
 
-@implementation KINWebBrowserSnapshotProgress
+@implementation KINWebBrowserSnapshotContext
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _snapshots = [NSMutableArray  array];
+    }
+
+    return self;
+}
+
+- (void)dealloc {
+    for(NSURL *file in _snapshots) {
+        NSError *error;
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        // [fileManager removeItemAtPath:[file path]  error:NULL];
+        if(![fileManager removeItemAtURL:file error:&error]) {
+            NSLog(@"unable to remove screenshot at path: %@", [file path]);
+        }
+    }
+}
+
+
+- (void) addScreenshot:(NSURL *) url  {
+    [_snapshots addObject:url];
+}
+
+- (NSArray<NSURL *> *)screenshots {
+    return _snapshots;
+}
 
 - (void)setCurrentIndex:(NSInteger)i {
     _index = i;
@@ -1250,7 +1278,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                             progress:(KINBrowserSnapshotProgressBlock)progressBlock
                            completed:(KINBrowserSnapshotCompletedBlock)completedBlock {
     NSOperationQueue *mainQueue = [NSOperationQueue new]; // [NSOperationQueue mainQueue];
-    KINWebBrowserSnapshotProgress *progress = [KINWebBrowserSnapshotProgress new];
+    KINWebBrowserSnapshotContext *progress = [KINWebBrowserSnapshotContext new];
     NSTimeInterval snapshotDelay = 0.5;
     NSInteger remainder = 0;
 
@@ -1361,7 +1389,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 }
 
-- (void) restoreWebBrowser:(KINWebBrowserSnapshotProgress *)progress {
+- (void) restoreWebBrowser:(KINWebBrowserSnapshotContext *)progress {
     self.webView.scrollView.contentSize = progress.initialContentSize;
     self.webView.scrollView.contentOffset = progress.initialContentOffset;
     self.webView.scrollView.scrollEnabled = progress.initialScrollEnabled;
@@ -1371,7 +1399,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     self.browserViewHeightConstraint.constant = progress.initialWebViewFrame.size.height;
     [self.webView setNeedsDisplay];
 }
-- (void)finishVisableSnapshot:(KINWebBrowserSnapshotProgress *)progress {
+- (void)finishVisableSnapshot:(KINWebBrowserSnapshotContext *)progress {
     @autoreleasepool {
          CGRect drawRect = CGRectMake(0,0,progress.initialWebViewFrame.size.width,progress.initialWebViewFrame.size.height);
         //CGRect drawRect = CGRectMake(progress.initialWebViewFrame.origin.x,progress.initialWebViewFrame.origin.y,progress.initialWebViewFrame.size.width,progress.initialWebViewFrame.size.height);
@@ -1393,7 +1421,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
             if(success) {
                 NSLog(@"+logging file to: %@",fullPathURL);
-
+                [progress addScreenshot:fullPathURL];
             } else
                 NSLog(@"-logging file to: %@",fullPathURL);
         }

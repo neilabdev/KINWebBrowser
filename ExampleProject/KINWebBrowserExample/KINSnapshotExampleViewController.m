@@ -37,7 +37,7 @@
 
     [self.scrollView addSubview:self.imageView];
     [self.view addSubview:self.scrollView];
-    [self.browser performScreenshotWithOptions:KINBrowserSnapshotOptionProgressive  progress:^(KINWebBrowserSnapshotProgress * progress)  {
+    [self.browser performScreenshotWithOptions:KINBrowserSnapshotOptionProgressive  progress:^(KINWebBrowserSnapshotContext * progress)  {
 
     } completed:^(UIImage *image, NSError *error, BOOL finished) {
         if(finished) {

@@ -107,17 +107,18 @@ typedef NS_ENUM(NSInteger,KINBrowserSnapshotOption) {
 };
 
 
-@interface KINWebBrowserSnapshotProgress : NSObject
+@interface KINWebBrowserSnapshotContext : NSObject
 @property (nonatomic, readonly) NSInteger index;
 @property (nonatomic, readonly) NSInteger pages;
 @property (nonatomic, readonly) BOOL cancelled;
+@property (nonatomic, readonly) NSArray <NSURL*> *screenshots;
 @property (nonatomic, assign) BOOL initialUserInteractionEnabled;
 @property (nonatomic, assign) BOOL initialScrollEnabled;
 
 - (void) cancel;
 @end
 
-typedef void(^KINBrowserSnapshotProgressBlock)(KINWebBrowserSnapshotProgress *progress);
+typedef void(^KINBrowserSnapshotProgressBlock)(KINWebBrowserSnapshotContext *progress);
 typedef void(^KINBrowserSnapshotCompletedBlock)(UIImage *image, NSError *error, BOOL finished);
 
 

@@ -77,7 +77,7 @@ static NSString *const defaultAddress =  @"http://blogs.spectator.co.uk/2016/07/
  //   self.snapshotEnabled = !self.snapshotEnabled;
  //   [self.webBrowser enableSnapshot:self.snapshotEnabled];
 
-    [self.webBrowser performScreenshotWithOptions:KINBrowserSnapshotOptionProgressive progress:^(KINWebBrowserSnapshotProgress *progress) {
+    [self.webBrowser performScreenshotWithOptions:KINBrowserSnapshotOptionProgressive progress:^(KINWebBrowserSnapshotContext *progress) {
        // [progress cancel];
     } completed:^(UIImage *image, NSError *error, BOOL finished) {
 
