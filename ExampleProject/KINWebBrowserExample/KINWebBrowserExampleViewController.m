@@ -77,6 +77,8 @@ static NSString *const defaultAddress =  @"http://blogs.spectator.co.uk/2016/07/
  //   self.snapshotEnabled = !self.snapshotEnabled;
  //   [self.webBrowser enableSnapshot:self.snapshotEnabled];
 
+    //[self performSnapshot];
+   // return;
     [self.webBrowser performScreenshotWithOptions: KINBrowserSnapshotOptionDefault // KINBrowserSnapshotOptionProgressive | KINBrowserSnapshotOptionFormatJPEG | KINBrowserSnapshotOptionCompressionLow
                                          progress:^(KINWebBrowserSnapshotContext *progress) {
        // [progress cancel];
@@ -109,6 +111,32 @@ static NSString *const defaultAddress =  @"http://blogs.spectator.co.uk/2016/07/
     }];
 
     return;
+}
+
+- (void) performSnapshot {
+    UIImage *image = nil;
+    BOOL renderInContext = NO;
+    BOOL useSnapshotView = NO;
+    UIView *captureView = self.webBrowser.webView;
+    //captureView = captureView.window;
+    UIGraphicsBeginImageContextWithOptions(captureView.bounds.size, YES, 0.0); //[UIScreen mainScreen].scale
+
+    if (renderInContext)
+        [captureView.layer renderInContext:UIGraphicsGetCurrentContext()]; //on device: CGImageCreateWithImageProvider: invalid image provider: NULL
+    else
+        [captureView drawViewHierarchyInRect:captureView.bounds afterScreenUpdates:YES];
+
+    image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+
+    KINSnapshotExampleViewController *snapshotExampleViewController =
+            [[KINSnapshotExampleViewController alloc] initWithImage:image];
+
+    UINavigationController *navigationController =
+            [[UINavigationController alloc] initWithRootViewController:snapshotExampleViewController];
+
+    [self presentViewController:navigationController animated:YES completion:^{  }];
+
 }
 
 - (NSArray *)webBrowser:(KINWebBrowserViewController *)webBrowser toolbarItems:(NSArray *)items {

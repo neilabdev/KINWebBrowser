@@ -304,12 +304,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 @property(nonatomic, retain) NSLayoutConstraint *browserViewBottomConstraint;
 @property(nonatomic, retain) NSLayoutConstraint *browserViewHeightConstraint;
-
-/*
- *    progress: (KINBrowserSnapshotProgressBlock) progress
-                           completed: (KINBrowserSnapshotCompletedBlock) completedBlock {
- */
-
+@property(nonatomic, strong) UIView *browserCanvas;
 
 - (NSArray *)loadWebBrowserToolbarItems;
 @end
@@ -417,28 +412,35 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     self.previousNavigationControllerToolbarHidden = self.navigationController.toolbarHidden;
     self.previousNavigationControllerNavigationBarHidden = self.navigationController.navigationBarHidden;
     self.automaticallyAdjustsScrollViewInsets = NO;
+    self.browserCanvas = [[UIView alloc] initWithFrame:self.view.bounds];
+    //self.browserCanvas.opaque = YES;
+
     if (self.wkWebView) {
         [self.wkWebView setFrame:self.view.bounds];
-        [self.wkWebView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+   //     [self.wkWebView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
         [self.wkWebView setNavigationDelegate:self];
         [self.wkWebView setUIDelegate:self];
         [self.wkWebView setMultipleTouchEnabled:YES];
         [self.wkWebView setAutoresizesSubviews:YES];
         [self.wkWebView.scrollView setAlwaysBounceVertical:YES];
-        [self.view addSubview:self.wkWebView];
+       // [self.view addSubview:self.wkWebView];
+        [self.browserCanvas addSubview:self.wkWebView];
         [self.wkWebView addObserver:self
                          forKeyPath:NSStringFromSelector(@selector(estimatedProgress))
                             options:0 context:KINWebBrowserContext];
     } else if (self.uiWebView) {
         [self.uiWebView setFrame:self.view.bounds];
-        [self.uiWebView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+      //  [self.uiWebView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
         [self.uiWebView setDelegate:self];
         [self.uiWebView setMultipleTouchEnabled:YES];
         [self.uiWebView setAutoresizesSubviews:YES];
         [self.uiWebView setScalesPageToFit:YES];
         [self.uiWebView.scrollView setAlwaysBounceVertical:YES];
-        [self.view addSubview:self.uiWebView];
+        [self.browserCanvas addSubview:self.wkWebView];
+     //   [self.view addSubview:self.uiWebView];
     }
+
+    [self.view addSubview:self.browserCanvas];
 
     self.progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
     [self.progressView setTrackTintColor:[UIColor colorWithWhite:1.0f alpha:0.0f]];
@@ -538,33 +540,66 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
             [self.view addConstraints:self.headerViewConstraints];
         }
 
+
+        /////
+        self.browserCanvas.translatesAutoresizingMaskIntoConstraints = NO;
+
+        NSLayoutConstraint *browserCanvasViewRightConstraint =
+                [NSLayoutConstraint constraintWithItem:self.browserCanvas
+                                             attribute:NSLayoutAttributeRight
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.view
+                                             attribute:NSLayoutAttributeRight multiplier:1 constant:0];
+
+        NSLayoutConstraint *browserCanvasViewTopConstraint =
+                [NSLayoutConstraint constraintWithItem:self.browserCanvas
+                                             attribute:NSLayoutAttributeTop
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:topView
+                                             attribute:NSLayoutAttributeBottom multiplier:1 constant:0];
+
+        NSLayoutConstraint *browserCanvasViewWidthConstraint =
+                [NSLayoutConstraint constraintWithItem:self.browserCanvas
+                                             attribute:NSLayoutAttributeWidth
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.view
+                                             attribute:NSLayoutAttributeWidth multiplier:1 constant:0];
+
+        NSLayoutConstraint *browserCanvasViewBottomConstraint =
+                [NSLayoutConstraint constraintWithItem:self.browserCanvas
+                                             attribute:NSLayoutAttributeBottom
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.bottomLayoutGuide
+                                             attribute:NSLayoutAttributeTop multiplier:1 constant:0];
+            //
+        /////
         NSLayoutConstraint *browserViewRightConstraint =
                 [NSLayoutConstraint constraintWithItem:self.webView
                                              attribute:NSLayoutAttributeRight
                                              relatedBy:NSLayoutRelationEqual
-                                                toItem:self.view
+                                                toItem:self.browserCanvas
                                              attribute:NSLayoutAttributeRight multiplier:1 constant:0];
 
         NSLayoutConstraint *browserViewTopConstraint =
                 [NSLayoutConstraint constraintWithItem:self.webView
                                              attribute:NSLayoutAttributeTop
                                              relatedBy:NSLayoutRelationEqual
-                                                toItem:topView
-                                             attribute:NSLayoutAttributeBottom multiplier:1 constant:0];
+                                                toItem:self.browserCanvas
+                                             attribute:NSLayoutAttributeTop multiplier:1 constant:0];
 
         NSLayoutConstraint *browserViewWidthConstraint =
                 [NSLayoutConstraint constraintWithItem:self.webView
                                              attribute:NSLayoutAttributeWidth
                                              relatedBy:NSLayoutRelationEqual
-                                                toItem:self.view
+                                                toItem:self.browserCanvas
                                              attribute:NSLayoutAttributeWidth multiplier:1 constant:0];
 
         self.browserViewBottomConstraint =
                 [NSLayoutConstraint constraintWithItem:self.webView
                                              attribute:NSLayoutAttributeBottom
                                              relatedBy:NSLayoutRelationEqual
-                                                toItem:self.bottomLayoutGuide
-                                             attribute:NSLayoutAttributeTop multiplier:1 constant:0];
+                                                toItem:self.browserCanvas
+                                             attribute:NSLayoutAttributeBottom multiplier:1 constant:0];
 
         self.browserViewBottomConstraint.priority = UILayoutPriorityDefaultHigh;
 
@@ -583,7 +618,10 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         self.webView.translatesAutoresizingMaskIntoConstraints = NO;
 
         [self.webViewConstraints addObjectsFromArray:
-                @[browserViewRightConstraint, browserViewTopConstraint, browserViewWidthConstraint,
+                @[
+                        browserCanvasViewRightConstraint,browserCanvasViewTopConstraint,browserCanvasViewWidthConstraint,
+                        browserCanvasViewBottomConstraint,
+                        browserViewRightConstraint, browserViewTopConstraint, browserViewWidthConstraint,
                         self.browserViewBottomConstraint, self.browserViewHeightConstraint] //browserViewHeightConstraint
         ];
 
@@ -1406,7 +1444,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                 self.browserViewHeightConstraint.constant = progress.snapshotHeight;
                 self.webView.scrollView.scrollEnabled = NO;
                 self.webView.userInteractionEnabled = NO;
-                [self.webView setNeedsDisplay];
+             //   [self.webView setNeedsDisplay];
             }];
             [NSThread sleepForTimeInterval:snapshotDelay];
         };
@@ -1433,7 +1471,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                     self.webView.scrollView.contentOffset = nextScrollPosition;
                     [self.webView.scrollView setContentOffset:nextScrollPosition animated:NO];
                     //    [self.webView setNeedsDisplay];
-
+                    NSLog(@"index = %d, pages = %d, position = %@ ",progress.index,progress.pages, NSStringFromCGPoint(nextScrollPosition));
                     if (progress.progressBlock)
                         progress.progressBlock(progress);
                 }];
@@ -1468,7 +1506,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                 return;
             [self performBrowserSnapshot:progress];
         }];
-
     }
 }
 
@@ -1486,11 +1523,11 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     @autoreleasepool {
         BOOL finished = progress.index == (progress.pages - 1);
         UIImage *image = nil;
-        BOOL renderInContext = YES;
+        BOOL renderInContext = NO;
         BOOL useSnapshotView = NO;
-        UIView *captureView = useSnapshotView ? [self.webView snapshotViewAfterScreenUpdates: YES] : self.webView;
+        UIView *captureView = useSnapshotView ? [self.browserCanvas snapshotViewAfterScreenUpdates: YES] : self.browserCanvas;
         //captureView = captureView.window;
-        UIGraphicsBeginImageContextWithOptions(progress.initialWebViewFrame.size, YES, 0.0); //[UIScreen mainScreen].scale
+        UIGraphicsBeginImageContextWithOptions(progress.initialWebViewFrame.size, YES, 1); //[UIScreen mainScreen].scale
 
         if (renderInContext)
             [captureView.layer renderInContext:UIGraphicsGetCurrentContext()]; //on device: CGImageCreateWithImageProvider: invalid image provider: NULL
@@ -1514,7 +1551,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
             NSLog(@"+logging file to: %@", fullPathURL);
             [progress addScreenshot:fullPathURL];
         }
-
 
         if (progress.completedBlock)
             progress.completedBlock(image, progress, finished);
