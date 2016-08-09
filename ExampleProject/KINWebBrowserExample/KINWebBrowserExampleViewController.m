@@ -77,23 +77,38 @@ static NSString *const defaultAddress =  @"http://blogs.spectator.co.uk/2016/07/
  //   self.snapshotEnabled = !self.snapshotEnabled;
  //   [self.webBrowser enableSnapshot:self.snapshotEnabled];
 
-    [self.webBrowser performScreenshotWithOptions:KINBrowserSnapshotOptionProgressive progress:^(KINWebBrowserSnapshotContext *progress) {
+    [self.webBrowser performScreenshotWithOptions: KINBrowserSnapshotOptionDefault // KINBrowserSnapshotOptionProgressive | KINBrowserSnapshotOptionFormatJPEG | KINBrowserSnapshotOptionCompressionLow
+                                         progress:^(KINWebBrowserSnapshotContext *progress) {
        // [progress cancel];
-    } completed:^(UIImage *image, NSError *error, BOOL finished) {
+    } completed:^(UIImage *image, KINWebBrowserSnapshotContext *context, BOOL finished) {
+        if(finished) {
+            UIImage * snapshot = context.snapshot;
+
+            NSError *error;
+            NSData *imageData = UIImageJPEGRepresentation(snapshot, 0.8); // UIImagePNGRepresentation(snapshot);
+            NSString *imageName = [NSString stringWithFormat:@"full_snapshot.jpg"];
+            NSString *pdfName = [NSString stringWithFormat:@"full_snapshot.pdf"];
+            NSURL *imageDir = [NSURL fileURLWithPath: NSTemporaryDirectory() ];
+            NSURL *fullPathURL = [imageDir URLByAppendingPathComponent:imageName];
+            NSURL *fullPDFURL = [imageDir URLByAppendingPathComponent:pdfName];
+            [[NSFileManager defaultManager] createDirectoryAtURL:imageDir
+                                     withIntermediateDirectories:YES attributes:@{} error:&error];
+            NSData *pdfData = [context pdf];
+            BOOL success = [imageData writeToURL:fullPathURL atomically:YES];
+            BOOL pdfSuccess = [pdfData writeToURL:fullPDFURL atomically:YES];
+
+
+            KINSnapshotExampleViewController *snapshotExampleViewController =
+                    [[KINSnapshotExampleViewController alloc] initWithImage:snapshot];
+
+            UINavigationController *navigationController =
+                    [[UINavigationController alloc] initWithRootViewController:snapshotExampleViewController];
+            [self presentViewController:navigationController animated:YES completion:^{  }];
+        }
 
     }];
 
-    return;/*
-*/
-    KINSnapshotExampleViewController *snapshotExampleViewController =
-            [[KINSnapshotExampleViewController alloc] initWithBrowser:self.webBrowser];
-
-    UINavigationController *navigationController =
-            [[UINavigationController alloc] initWithRootViewController:snapshotExampleViewController];
-    [self presentViewController:navigationController animated:YES completion:^{
-
-    }];
-
+    return;
 }
 
 - (NSArray *)webBrowser:(KINWebBrowserViewController *)webBrowser toolbarItems:(NSArray *)items {
@@ -148,6 +163,7 @@ static NSString *const defaultAddress =  @"http://blogs.spectator.co.uk/2016/07/
 - (IBAction)pushButtonPressed:(id)sender {
     KINWebBrowserViewController *webBrowser =  self.webBrowser = [KINWebBrowserViewController webBrowser];
     [webBrowser setDelegate:self];
+  //  [webBrowser setBrowserViewClass:[UIWebView class]];
     [self.navigationController pushViewController:webBrowser animated:YES];
     [webBrowser loadURLString:defaultAddress];
 }
@@ -161,6 +177,7 @@ static NSString *const defaultAddress =  @"http://blogs.spectator.co.uk/2016/07/
     webBrowser.barTintColor = [UIColor colorWithRed:102.0f/255.0f green:204.0f/255.0f blue:51.0f/255.0f alpha:1.0f];
     webBrowser.showsPageTitleInNavigationBar = NO;
     webBrowser.showsURLInNavigationBar = NO;
+    //webBrowser.browserViewClass = [UIWebView class];
     [self presentViewController:webBrowserNavigationController animated:YES completion:nil];
 
     [webBrowser loadURLString:defaultAddress];

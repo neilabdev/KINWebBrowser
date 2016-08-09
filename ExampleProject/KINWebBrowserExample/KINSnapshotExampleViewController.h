@@ -9,5 +9,5 @@
 
 
 @interface KINSnapshotExampleViewController : UIViewController
-- (instancetype)initWithBrowser: (KINWebBrowserViewController *) browserViewController;
+- (instancetype)initWithImage: (UIImage *) image;
 @end

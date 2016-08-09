@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
   s.homepage     = "https://github.com/dfmuir/KINWebBrowser"
   s.license      = { :type => 'MIT', :file => 'LICENSE' }
   s.author             = { "David F. Muir V" => "dfmuir@gmail.com" }
-  s.platform     = :ios, '7.0'
+  s.platform     = :ios, '8.0'
   s.source       = { :git => "https://github.com/dfmuir/KINWebBrowser.git", :tag => s.version.to_s }
   s.source_files  = 'KINWebBrowser', 'KINWebBrowser/**/*.{h,m}'
   s.resources = "Assets/*.png"

@@ -66,6 +66,9 @@
     BOOL _cancelled;
     NSMutableArray *_snapshots;
 }
+
+@property(nonatomic, assign) BOOL initialUserInteractionEnabled;
+@property(nonatomic, assign) BOOL initialScrollEnabled;
 @property(nonatomic, assign) CGRect initialWebViewFrame;
 @property(nonatomic, assign) CGSize initialContentSize;
 @property(nonatomic, assign) CGPoint initialContentOffset;
@@ -74,36 +77,106 @@
 @property(nonatomic, copy) KINBrowserSnapshotCompletedBlock completedBlock;
 @property(nonatomic, getter=pages, setter=setTotalPages:) NSInteger total_pages;
 @property(nonatomic, getter=index, setter=setCurrentIndex:) NSInteger current_index;
+@property(nonatomic, assign) KINBrowserSnapshotOption option;
+@property(nonatomic, assign) CGFloat compression;
 @end
 
 @implementation KINWebBrowserSnapshotContext
-
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _snapshots = [NSMutableArray  array];
+        _snapshots = [NSMutableArray array];
+        _compression = 1.0;
     }
 
     return self;
 }
 
 - (void)dealloc {
-    for(NSURL *file in _snapshots) {
+    for (NSURL *file in _snapshots) {
         NSError *error;
         NSFileManager *fileManager = [NSFileManager defaultManager];
-        // [fileManager removeItemAtPath:[file path]  error:NULL];
-        if(![fileManager removeItemAtURL:file error:&error]) {
+        if (![fileManager removeItemAtURL:file error:&error]) {
             NSLog(@"unable to remove screenshot at path: %@", [file path]);
         }
     }
 }
 
+- (NSData *)_convertImageToPDF:(UIImage *)image withHorizontalResolution:(CGFloat)horzRes verticalResolution:(CGFloat)vertRes {
+    if ((horzRes <= 0) || (vertRes <= 0)) {
+        return nil;
+    }
 
-- (void) addScreenshot:(NSURL *) url  {
+    CGFloat pageWidth = image.size.width * image.scale * 72 / horzRes;
+    CGFloat pageHeight = image.size.height * image.scale * 72 / vertRes;
+
+    NSMutableData *pdfFile = [[NSMutableData alloc] init];
+    CGDataConsumerRef pdfConsumer = CGDataConsumerCreateWithCFData((__bridge CFMutableDataRef) pdfFile);
+    // The page size matches the image, no white borders.
+    CGRect mediaBox = CGRectMake(0, 0, pageWidth, pageHeight);
+    CGContextRef pdfContext = CGPDFContextCreate(pdfConsumer, &mediaBox, NULL);
+
+    CGContextBeginPage(pdfContext, &mediaBox);
+    switch (image.imageOrientation) {
+        case UIImageOrientationDown:
+            CGContextTranslateCTM(pdfContext, pageWidth, pageHeight);
+            CGContextScaleCTM(pdfContext, -1, -1);
+            break;
+
+        case UIImageOrientationLeft:
+            mediaBox.size.width = pageHeight;
+            mediaBox.size.height = pageWidth;
+            CGContextTranslateCTM(pdfContext, pageWidth, 0);
+            CGContextRotateCTM(pdfContext, M_PI / 2);
+            break;
+
+        case UIImageOrientationRight:
+            mediaBox.size.width = pageHeight;
+            mediaBox.size.height = pageWidth;
+            CGContextTranslateCTM(pdfContext, 0, pageHeight);
+            CGContextRotateCTM(pdfContext, -M_PI / 2);
+            break;
+
+        case UIImageOrientationUp:
+        default:
+            break;
+
+    }
+    CGContextDrawImage(pdfContext, mediaBox, [image CGImage]);
+    CGContextEndPage(pdfContext);
+    CGContextRelease(pdfContext);
+    CGDataConsumerRelease(pdfConsumer);
+
+    return pdfFile;
+}
+
+- (NSData *)pdf {
+    return [self _convertImageToPDF:[self snapshot] withHorizontalResolution:300 verticalResolution:300];
+}
+
+- (UIImage *)snapshot {
+    UIImage *finalImage = nil;
+    CGSize size = CGSizeMake(self.initialWebViewFrame.size.width, self.initialWebViewFrame.size.height * self.pages);
+    CGFloat y_offset = 0.0;
+
+    UIGraphicsBeginImageContext(size);
+    for (NSURL *file in self.snapshots) {
+        @autoreleasepool {
+            UIImage *image = [UIImage imageWithData:[NSData dataWithContentsOfURL:file]];
+            [image drawInRect:CGRectMake(0, y_offset, size.width, image.size.height)];
+            y_offset += image.size.height;
+        }
+    }
+    finalImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return finalImage;
+}
+
+- (void)addScreenshot:(NSURL *)url {
     [_snapshots addObject:url];
 }
 
-- (NSArray<NSURL *> *)screenshots {
+- (NSArray<NSURL *> *)snapshots {
     return _snapshots;
 }
 
@@ -133,6 +206,20 @@
             [NSError errorWithDomain:@"KINWebBrowser" code:100 userInfo:@{@"message" : @"snapshot was cancelled"}];
     if (self.completedBlock)
         self.completedBlock(nil, error, NO);
+}
+
+- (CGFloat)compression {
+    if ((_option & KINBrowserSnapshotOptionCompressionHigh) == KINBrowserSnapshotOptionCompressionHigh) {
+        _compression = 0.3;
+    } else if ((_option & KINBrowserSnapshotOptionCompressionHigh) == KINBrowserSnapshotOptionCompressionMedium) {
+        _compression = 0.5;
+    } else if ((_option & KINBrowserSnapshotOptionCompressionHigh) == KINBrowserSnapshotOptionCompressionLow) {
+        _compression = 0.8;
+    } else {
+        _compression = 1.0;
+    }
+
+    return _compression;
 }
 @end
 
@@ -1277,19 +1364,29 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void)performScreenshotWithOptions:(KINBrowserSnapshotOption)option
                             progress:(KINBrowserSnapshotProgressBlock)progressBlock
                            completed:(KINBrowserSnapshotCompletedBlock)completedBlock {
+    [self performScreenshotWithOptions:option interval:0.5 progress:progressBlock completed:completedBlock];
+}
+
+- (void)performScreenshotWithOptions:(KINBrowserSnapshotOption)option
+                            interval:(NSTimeInterval)interval
+                            progress:(KINBrowserSnapshotProgressBlock)progressBlock
+                           completed:(KINBrowserSnapshotCompletedBlock)completedBlock {
     NSOperationQueue *mainQueue = [NSOperationQueue new]; // [NSOperationQueue mainQueue];
     KINWebBrowserSnapshotContext *progress = [KINWebBrowserSnapshotContext new];
-    NSTimeInterval snapshotDelay = 0.5;
+    NSTimeInterval snapshotDelay = interval;
     NSInteger remainder = 0;
+    BOOL progressiveSnapshot = (option & KINBrowserSnapshotOptionProgressive) == KINBrowserSnapshotOptionProgressive;
+    BOOL isJPEGSnapshot = (option & KINBrowserSnapshotOptionFormatJPEG) == KINBrowserSnapshotOptionFormatJPEG;
 
     mainQueue.maxConcurrentOperationCount = 1;
+    progress.option = option;
     progress.progressBlock = progressBlock;
     progress.completedBlock = completedBlock;
     progress.initialContentSize = self.webView.scrollView.contentSize;
     progress.initialContentOffset = self.webView.scrollView.contentOffset;
     progress.initialWebViewFrame = self.webView.frame;
     progress.initialScrollEnabled = self.webView.scrollView.scrollEnabled;
-    progress.initialUserInteractionEnabled = self.webView.userInteractionEnabled ;
+    progress.initialUserInteractionEnabled = self.webView.userInteractionEnabled;
 
     remainder = (int) progress.initialContentSize.height % (int) progress.initialWebViewFrame.size.height;
     progress.total_pages =
@@ -1297,12 +1394,11 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     progress.current_index = 0;
     progress.snapshotHeight = progress.pages * progress.initialWebViewFrame.size.height;
 
-    if (option == KINBrowserSnapshotOptionProgressive) {
+    if (progressiveSnapshot) {
         NSOperation *lastOperation = nil;
         NSMutableArray <NSOperation * > *operations = [NSMutableArray array];
         KINSnapshotOperation *firstOperation = [KINSnapshotOperation new];
         firstOperation.workBlock = ^{
-            NSLog(@"-performScreenshotWithOptions: first %d", progress.index);
             [[NSOperationQueue mainQueue] addOperationWithBlock:^{
                 self.webView.scrollView.contentSize = CGSizeMake(0, progress.snapshotHeight * 2);
                 self.webView.scrollView.contentOffset = CGPointZero;
@@ -1311,7 +1407,6 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                 self.webView.scrollView.scrollEnabled = NO;
                 self.webView.userInteractionEnabled = NO;
                 [self.webView setNeedsDisplay];
-                NSLog(@"+performScreenshotWithOptions: first %d", progress.index);
             }];
             [NSThread sleepForTimeInterval:snapshotDelay];
         };
@@ -1326,7 +1421,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                     [mainQueue cancelAllOperations];
                     [[NSOperationQueue mainQueue] addOperationWithBlock:^{
                         [self restoreWebBrowser:progress];
-                      //  NSLog(@"+performScreenshotWithOptions: finish: %d", progress.index);
+                        //  NSLog(@"+performScreenshotWithOptions: finish: %d", progress.index);
                     }];
                     return;
                 }
@@ -1336,21 +1431,18 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                     CGPoint nextScrollPosition = CGPointMake(0, progress.index * progress.initialWebViewFrame.size.height);
                     progress.current_index = next_page;
                     self.webView.scrollView.contentOffset = nextScrollPosition;
-                    [self.webView.scrollView setContentOffset:nextScrollPosition animated:YES];
-                    [self.webView setNeedsDisplay];
+                    [self.webView.scrollView setContentOffset:nextScrollPosition animated:NO];
+                    //    [self.webView setNeedsDisplay];
 
-                    if(progress.progressBlock)
+                    if (progress.progressBlock)
                         progress.progressBlock(progress);
-                    NSLog(@"+performScreenshotWithOptions: snap %d / %d", progress.index, i);
                 }];
-                //   NSLog(@"?sleep:performScreenshotWithOptions: done %d / %d",progress.index, i);
+
                 [NSThread sleepForTimeInterval:snapshotDelay];
 
                 [[NSOperationQueue mainQueue] addOperationWithBlock:^{
-                    [self finishVisableSnapshot:progress];
+                    [self performBrowserSnapshot:progress];
                 }];
-
-              //  progress.p
             };
 
             [operation addDependency:lastOperation ? lastOperation : firstOperation];
@@ -1361,73 +1453,71 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
         KINSnapshotOperation *finishOperation = [KINSnapshotOperation new];
         finishOperation.workBlock = ^{
-            NSLog(@"-performScreenshotWithOptions: finish: %d", progress.index);
             [NSThread sleepForTimeInterval:snapshotDelay];
             [[NSOperationQueue mainQueue] addOperationWithBlock:^{
                 [self restoreWebBrowser:progress];
-                NSLog(@"+performScreenshotWithOptions: finish: %d", progress.index);
             }];
         };
 
         [finishOperation addDependency:[operations lastObject]];
         [mainQueue addOperation:finishOperation];
     } else {
-        // [self performSelector:@selector(finishVisableSnapshot) withObject:nil afterDelay:0];
+        // [self performSelector:@selector(performBrowserSnapshot) withObject:nil afterDelay:0];
         [[NSOperationQueue mainQueue] addOperationWithBlock:^{
             if (progress.cancelled)
                 return;
-            [self finishVisableSnapshot:progress];
+            [self performBrowserSnapshot:progress];
         }];
 
     }
 }
 
-- (void)beginProgressiveSnapshot {
-    CGSize initialContentSize = self.webView.scrollView.contentSize;
-    CGRect initialWebViewFrame = self.webView.frame;
-    NSInteger remainder = (int) initialContentSize.height % (int) initialWebViewFrame.size.height;
-
-}
-
-- (void) restoreWebBrowser:(KINWebBrowserSnapshotContext *)progress {
+- (void)restoreWebBrowser:(KINWebBrowserSnapshotContext *)progress {
     self.webView.scrollView.contentSize = progress.initialContentSize;
     self.webView.scrollView.contentOffset = progress.initialContentOffset;
     self.webView.scrollView.scrollEnabled = progress.initialScrollEnabled;
     self.webView.userInteractionEnabled = progress.initialUserInteractionEnabled;
     self.browserViewBottomConstraint.active = YES;
-    ////   [self.view addConstraint: self.browserViewBottomConstraint];
     self.browserViewHeightConstraint.constant = progress.initialWebViewFrame.size.height;
     [self.webView setNeedsDisplay];
 }
-- (void)finishVisableSnapshot:(KINWebBrowserSnapshotContext *)progress {
+
+- (void)performBrowserSnapshot:(KINWebBrowserSnapshotContext *)progress {
     @autoreleasepool {
-         CGRect drawRect = CGRectMake(0,0,progress.initialWebViewFrame.size.width,progress.initialWebViewFrame.size.height);
-        //CGRect drawRect = CGRectMake(progress.initialWebViewFrame.origin.x,progress.initialWebViewFrame.origin.y,progress.initialWebViewFrame.size.width,progress.initialWebViewFrame.size.height);
+        BOOL finished = progress.index == (progress.pages - 1);
+        UIImage *image = nil;
+        BOOL renderInContext = YES;
+        BOOL useSnapshotView = NO;
+        UIView *captureView = useSnapshotView ? [self.webView snapshotViewAfterScreenUpdates: YES] : self.webView;
+        //captureView = captureView.window;
+        UIGraphicsBeginImageContextWithOptions(progress.initialWebViewFrame.size, YES, 0.0); //[UIScreen mainScreen].scale
 
-        UIGraphicsBeginImageContextWithOptions(progress.initialWebViewFrame.size, true,0.0);// [UIScreen mainScreen].scale
-    //    [self.webView drawViewHierarchyInRect:drawRect afterScreenUpdates:YES];
-        [self.webView.layer renderInContext:UIGraphicsGetCurrentContext()];
-        UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+        if (renderInContext)
+            [captureView.layer renderInContext:UIGraphicsGetCurrentContext()]; //on device: CGImageCreateWithImageProvider: invalid image provider: NULL
+        else
+            [captureView drawViewHierarchyInRect:CGRectMake(0, 0, progress.initialWebViewFrame.size.width, progress.initialWebViewFrame.size.height) afterScreenUpdates:YES];
 
-        if(image) {
+        image = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+
+        if (image) {
             NSError *error;
-            NSData *imageData = UIImagePNGRepresentation(image);
-            NSString *imageName = [NSString stringWithFormat:@"snapshot_%d.png",progress.index];
-            NSURL *imageDir = [NSURL fileURLWithPath: NSTemporaryDirectory() ];
+            NSData *imageData =  UIImagePNGRepresentation(image);
+            NSString *imageName = [NSString stringWithFormat:@"snapshot_%p_%d.%@", self.view, progress.index, @"png"];
+            NSURL *imageDir = [NSURL fileURLWithPath:NSTemporaryDirectory()];
             NSURL *fullPathURL = [imageDir URLByAppendingPathComponent:imageName];
             [[NSFileManager defaultManager] createDirectoryAtURL:imageDir
                                      withIntermediateDirectories:YES attributes:@{} error:&error];
             BOOL success = [imageData writeToURL:fullPathURL atomically:YES];
 
-            if(success) {
-                NSLog(@"+logging file to: %@",fullPathURL);
-                [progress addScreenshot:fullPathURL];
-            } else
-                NSLog(@"-logging file to: %@",fullPathURL);
+            NSAssert(success,@"Unable to write snapshot to path: %@",fullPathURL);
+            NSLog(@"+logging file to: %@", fullPathURL);
+            [progress addScreenshot:fullPathURL];
         }
 
+
         if (progress.completedBlock)
-            progress.completedBlock(image, nil, image != nil);
+            progress.completedBlock(image, progress, finished);
     }
 }
 
