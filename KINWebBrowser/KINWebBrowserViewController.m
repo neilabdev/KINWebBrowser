@@ -304,7 +304,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
 @property(nonatomic, retain) NSLayoutConstraint *browserViewBottomConstraint;
 @property(nonatomic, retain) NSLayoutConstraint *browserViewHeightConstraint;
-@property(nonatomic, strong) UIView *browserCanvas;
+@property(nonatomic, strong) UIScrollView *browserCanvas;
 
 - (NSArray *)loadWebBrowserToolbarItems;
 @end
@@ -370,6 +370,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     self.progressViewConstraints = [NSMutableArray array];
     self.headerViewConstraints = [NSMutableArray array];
     self.webViewConstraints = [NSMutableArray array];
+    self.snapshotDelay = 0.5;
+    self.snapshotPadding = 0;
 
     _isActiveBrowser = NO;
 }
@@ -412,7 +414,9 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     self.previousNavigationControllerToolbarHidden = self.navigationController.toolbarHidden;
     self.previousNavigationControllerNavigationBarHidden = self.navigationController.navigationBarHidden;
     self.automaticallyAdjustsScrollViewInsets = NO;
-    self.browserCanvas = [[UIView alloc] initWithFrame:self.view.bounds];
+    self.browserCanvas =  [[UIScrollView alloc] initWithFrame:self.view.bounds]; //[[UIView alloc] initWithFrame:self.view.bounds];
+    self.browserCanvas.scrollEnabled = NO;
+
     //self.browserCanvas.opaque = YES;
 
     if (self.wkWebView) {
@@ -579,6 +583,12 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                                              relatedBy:NSLayoutRelationEqual
                                                 toItem:self.browserCanvas
                                              attribute:NSLayoutAttributeRight multiplier:1 constant:0];
+        NSLayoutConstraint *browserViewLeftConstraint =
+                [NSLayoutConstraint constraintWithItem:self.webView
+                                             attribute:NSLayoutAttributeLeft
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:self.browserCanvas
+                                             attribute:NSLayoutAttributeLeft multiplier:1 constant:0];
 
         NSLayoutConstraint *browserViewTopConstraint =
                 [NSLayoutConstraint constraintWithItem:self.webView
@@ -591,15 +601,15 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                 [NSLayoutConstraint constraintWithItem:self.webView
                                              attribute:NSLayoutAttributeWidth
                                              relatedBy:NSLayoutRelationEqual
-                                                toItem:self.browserCanvas
+                                                toItem:self.view
                                              attribute:NSLayoutAttributeWidth multiplier:1 constant:0];
 
         self.browserViewBottomConstraint =
                 [NSLayoutConstraint constraintWithItem:self.webView
                                              attribute:NSLayoutAttributeBottom
                                              relatedBy:NSLayoutRelationEqual
-                                                toItem:self.browserCanvas
-                                             attribute:NSLayoutAttributeBottom multiplier:1 constant:0];
+                                                toItem:self.bottomLayoutGuide
+                                             attribute:NSLayoutAttributeTop multiplier:1 constant:0];
 
         self.browserViewBottomConstraint.priority = UILayoutPriorityDefaultHigh;
 
@@ -619,26 +629,19 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
         [self.webViewConstraints addObjectsFromArray:
                 @[
-                        browserCanvasViewRightConstraint,browserCanvasViewTopConstraint,browserCanvasViewWidthConstraint,
+                        browserCanvasViewRightConstraint,
+                        browserCanvasViewTopConstraint,
+                        browserCanvasViewWidthConstraint,
                         browserCanvasViewBottomConstraint,
-                        browserViewRightConstraint, browserViewTopConstraint, browserViewWidthConstraint,
+                 //       browserViewRightConstraint,
+                        browserViewLeftConstraint,
+                         browserViewTopConstraint,
+                        browserViewWidthConstraint,
                         self.browserViewBottomConstraint, self.browserViewHeightConstraint] //browserViewHeightConstraint
         ];
 
         [self.view addConstraints:self.webViewConstraints];
         self.configuredAutolayout = YES;
-    }
-}
-
-- (void)enableSnapshot:(BOOL)truth {
-
-    if (truth) {
-        self.browserViewBottomConstraint.active = NO;
-        self.browserViewHeightConstraint.constant = self.webView.scrollView.contentSize.height;
-
-    } else {
-        self.browserViewBottomConstraint.active = YES;
-        self.browserViewHeightConstraint.constant = self.webView.scrollView.contentSize.height;
     }
 }
 
@@ -1393,16 +1396,17 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     return UIInterfaceOrientationMaskAllButUpsideDown;
 }
 
-- (BOOL)shouldAutorotate {
-    return YES;
+- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id <UIViewControllerTransitionCoordinator>)coordinator {
+    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator]; // cancel snapshot
 }
+
 
 #pragma mark - Snapshot
 
 - (void)performScreenshotWithOptions:(KINBrowserSnapshotOption)option
                             progress:(KINBrowserSnapshotProgressBlock)progressBlock
                            completed:(KINBrowserSnapshotCompletedBlock)completedBlock {
-    [self performScreenshotWithOptions:option interval:0.5 progress:progressBlock completed:completedBlock];
+    [self performScreenshotWithOptions:option interval:self.snapshotDelay progress:progressBlock completed:completedBlock];
 }
 
 - (void)performScreenshotWithOptions:(KINBrowserSnapshotOption)option
@@ -1415,7 +1419,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     NSInteger remainder = 0;
     BOOL progressiveSnapshot = (option & KINBrowserSnapshotOptionProgressive) == KINBrowserSnapshotOptionProgressive;
     BOOL isJPEGSnapshot = (option & KINBrowserSnapshotOptionFormatJPEG) == KINBrowserSnapshotOptionFormatJPEG;
-
+    CGFloat pageRatio = 0.0;
     mainQueue.maxConcurrentOperationCount = 1;
     progress.option = option;
     progress.progressBlock = progressBlock;
@@ -1425,12 +1429,24 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     progress.initialWebViewFrame = self.webView.frame;
     progress.initialScrollEnabled = self.webView.scrollView.scrollEnabled;
     progress.initialUserInteractionEnabled = self.webView.userInteractionEnabled;
-
-    remainder = (int) progress.initialContentSize.height % (int) progress.initialWebViewFrame.size.height;
-    progress.total_pages =
-            (int) progress.initialContentSize.height / (int) progress.initialWebViewFrame.size.height + (remainder > 0 ? 1 : 0);
-    progress.current_index = 0;
+    pageRatio = (int)(progress.initialContentSize.height / progress.initialWebViewFrame.size.height);
+    remainder = (int) progress.initialContentSize.height % (int)progress.initialWebViewFrame.size.height;
+    progress.total_pages = (int)pageRatio + (remainder > 0 ? 1 : 0);
     progress.snapshotHeight = progress.pages * progress.initialWebViewFrame.size.height;
+    progress.current_index = 0;
+  //  CGFloat remainderHeight = pageRatio + remainder;
+    CGFloat paddingHeight = progress.initialContentSize.height +  self.snapshotPadding;
+    progress.snapshotHeight < paddingHeight ? 0 : 0;
+
+    /*******************************************************************************************************************
+     ** Can be used to determine page height, though scrollView.contentSize works for now.
+        NSString * script=@"var body = document.body, html = document.documentElement;\n"
+            "var height = Math.max( body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight );  height;";
+
+        [self.webView evaluateJavaScript:script then:^(id o, NSError *error) {
+            NSLog(@"objc = %@",o);
+        }];
+    *******************************************************************************************************************/
 
     if (progressiveSnapshot) {
         NSOperation *lastOperation = nil;
@@ -1438,13 +1454,17 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         KINSnapshotOperation *firstOperation = [KINSnapshotOperation new];
         firstOperation.workBlock = ^{
             [[NSOperationQueue mainQueue] addOperationWithBlock:^{
-                self.webView.scrollView.contentSize = CGSizeMake(0, progress.snapshotHeight * 2);
+                self.webView.scrollView.contentSize = CGSizeMake(self.webView.bounds.size.width, progress.snapshotHeight ); //* 2
                 self.webView.scrollView.contentOffset = CGPointZero;
-                self.browserViewBottomConstraint.active = NO;
-                self.browserViewHeightConstraint.constant = progress.snapshotHeight;
                 self.webView.scrollView.scrollEnabled = NO;
                 self.webView.userInteractionEnabled = NO;
-             //   [self.webView setNeedsDisplay];
+                self.browserViewBottomConstraint.active = NO;
+                self.browserViewHeightConstraint.constant = progress.snapshotHeight;
+
+                self.browserCanvas.scrollEnabled = YES;
+                self.browserCanvas.contentOffset = CGPointZero;
+                self.browserCanvas.userInteractionEnabled = NO;
+                // self.browserCanvas.contentSize =  CGSizeMake(progress.initialContentSize .width, progress.snapshotHeight); //
             }];
             [NSThread sleepForTimeInterval:snapshotDelay];
         };
@@ -1459,18 +1479,13 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                     [mainQueue cancelAllOperations];
                     [[NSOperationQueue mainQueue] addOperationWithBlock:^{
                         [self restoreWebBrowser:progress];
-                        //  NSLog(@"+performScreenshotWithOptions: finish: %d", progress.index);
                     }];
                     return;
                 }
 
                 [[NSOperationQueue mainQueue] addOperationWithBlock:^{
-                    NSInteger next_page = progress.index + 1;
                     CGPoint nextScrollPosition = CGPointMake(0, progress.index * progress.initialWebViewFrame.size.height);
-                    progress.current_index = next_page;
-                    self.webView.scrollView.contentOffset = nextScrollPosition;
-                    [self.webView.scrollView setContentOffset:nextScrollPosition animated:NO];
-                    //    [self.webView setNeedsDisplay];
+                    [self.browserCanvas setContentOffset:nextScrollPosition animated:NO];
                     NSLog(@"index = %d, pages = %d, position = %@ ",progress.index,progress.pages, NSStringFromCGPoint(nextScrollPosition));
                     if (progress.progressBlock)
                         progress.progressBlock(progress);
@@ -1480,6 +1495,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 
                 [[NSOperationQueue mainQueue] addOperationWithBlock:^{
                     [self performBrowserSnapshot:progress];
+                    progress.current_index =  progress.index + 1;
                 }];
             };
 
@@ -1516,7 +1532,13 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
     self.webView.userInteractionEnabled = progress.initialUserInteractionEnabled;
     self.browserViewBottomConstraint.active = YES;
     self.browserViewHeightConstraint.constant = progress.initialWebViewFrame.size.height;
-    [self.webView setNeedsDisplay];
+
+
+    self.browserCanvas.scrollEnabled = NO;
+  //  self.browserCanvas.contentSize = progress.initialContentSize;
+    self.browserCanvas.contentOffset = CGPointZero;
+    self.browserCanvas.userInteractionEnabled = YES;
+   // [self.webView setNeedsDisplay];
 }
 
 - (void)performBrowserSnapshot:(KINWebBrowserSnapshotContext *)progress {
@@ -1527,7 +1549,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         BOOL useSnapshotView = NO;
         UIView *captureView = useSnapshotView ? [self.browserCanvas snapshotViewAfterScreenUpdates: YES] : self.browserCanvas;
         //captureView = captureView.window;
-        UIGraphicsBeginImageContextWithOptions(progress.initialWebViewFrame.size, YES, 1); //[UIScreen mainScreen].scale
+        UIGraphicsBeginImageContextWithOptions(progress.initialWebViewFrame.size, YES, 1.0); //todo: Why must we use 1 instead of [UIScreen mainScreen].scale on iPad Pro?
 
         if (renderInContext)
             [captureView.layer renderInContext:UIGraphicsGetCurrentContext()]; //on device: CGImageCreateWithImageProvider: invalid image provider: NULL
@@ -1562,6 +1584,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
 - (void)dealloc {
     [self.webView stopLoading];
     [self.uiWebView setDelegate:nil];
+    [self.wkWebView setNavigationDelegate:nil];
     [self.wkWebView setNavigationDelegate:nil];
     [self.wkWebView setUIDelegate:nil];
     if ([self isViewLoaded]) {

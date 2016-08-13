@@ -41,7 +41,7 @@
 @property (nonatomic,assign) BOOL snapshotEnabled;
 @end
 
-static NSString *const defaultAddress =  @"http://blogs.spectator.co.uk/2016/07/will-politicians-accept-reality-islamic-terrorism/"; // @"https://www.apple.com";
+static NSString *const defaultAddress = @"http://www.theatlantic.com/politics/archive/2011/10/us-troops-are-leaving-because-iraq-doesnt-want-them-there/247174/" ;//  @"http://blogs.spectator.co.uk/2016/07/will-politicians-accept-reality-islamic-terrorism/"; // @"https://www.apple.com";
 
 @implementation KINWebBrowserExampleViewController
 

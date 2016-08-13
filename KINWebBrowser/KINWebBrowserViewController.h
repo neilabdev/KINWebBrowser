@@ -214,14 +214,13 @@ typedef void(^KINBrowserSnapshotCompletedBlock)(UIImage *image, KINWebBrowserSna
 @property(nonatomic, assign) BOOL actionButtonHidden;
 @property(nonatomic, assign) BOOL showsURLInNavigationBar;
 @property(nonatomic, assign) BOOL showsPageTitleInNavigationBar;
+@property(nonatomic, assign) CGFloat snapshotPadding;
+@property(nonatomic, assign) NSTimeInterval  snapshotDelay;
 
 //Allow for custom activities in the browser by populating this optional array
 @property(nonatomic, strong) NSArray *customActivityItems;
 
-//@property(nonatomic, strong, readonly, getter=backButton) UIBarButtonItem *backButtonItem;
-//@property(nonatomic, strong, readonly, getter=forwardButton) UIBarButtonItem *forwardButtonItem;
 #pragma mark - Public Interface
-
 // Load a NSURLURLRequest to web view
 // Can be called any time after initialization
 - (void)loadRequest:(NSURLRequest *)request;
