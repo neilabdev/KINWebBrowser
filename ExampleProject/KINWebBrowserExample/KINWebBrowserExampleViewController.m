@@ -41,8 +41,8 @@
 @property (nonatomic,assign) BOOL snapshotEnabled;
 @end
 
-static NSString *const defaultAddress = @"http://www.theatlantic.com/politics/archive/2011/10/us-troops-are-leaving-because-iraq-doesnt-want-them-there/247174/" ;//  @"http://blogs.spectator.co.uk/2016/07/will-politicians-accept-reality-islamic-terrorism/"; // @"https://www.apple.com";
-
+static NSString *const defaultAddress = @"http://www.thedailybeast.com/articles/2015/12/15/doj-trump-s-early-businesses-blocked-blacks.html" ; // @"http://blogs.spectator.co.uk/2016/07/will-politicians-accept-reality-islamic-terrorism/"; // @"https://www.apple.com";
+// @"http://www.theatlantic.com/politics/archive/2011/10/us-troops-are-leaving-because-iraq-doesnt-want-them-there/247174/" ;
 @implementation KINWebBrowserExampleViewController
 
 - (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
@@ -73,12 +73,6 @@ static NSString *const defaultAddress = @"http://www.theatlantic.com/politics/ar
 }
 
 - (void) takeSnapshot:(id) sender {
-    NSLog(@"take snapshot");
- //   self.snapshotEnabled = !self.snapshotEnabled;
- //   [self.webBrowser enableSnapshot:self.snapshotEnabled];
-
-    //[self performSnapshot];
-   // return;
     [self.webBrowser performScreenshotWithOptions: KINBrowserSnapshotOptionDefault // KINBrowserSnapshotOptionProgressive | KINBrowserSnapshotOptionFormatJPEG | KINBrowserSnapshotOptionCompressionLow
                                          progress:^(KINWebBrowserSnapshotContext *progress) {
        // [progress cancel];

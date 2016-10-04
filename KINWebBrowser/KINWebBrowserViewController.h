@@ -164,7 +164,6 @@ typedef void(^KINBrowserSnapshotCompletedBlock)(UIImage *image, KINWebBrowserSna
 @property(nonatomic, strong) UIProgressView *progressView;
 
 
-- (void)enableSnapshot:(BOOL)truth  __deprecated;
 
 // The web views
 // Depending on the version of iOS, one of these will be set

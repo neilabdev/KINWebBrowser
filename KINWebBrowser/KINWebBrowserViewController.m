@@ -504,11 +504,18 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                                              relatedBy:NSLayoutRelationEqual
                                                 toItem:self.view
                                              attribute:NSLayoutAttributeWidth multiplier:1 constant:0];
+        NSLayoutConstraint *progressViewHeightConstraint =
+                [NSLayoutConstraint constraintWithItem:self.progressView
+                                             attribute:NSLayoutAttributeHeight
+                                             relatedBy:NSLayoutRelationEqual
+                                                toItem:nil
+                                             attribute:NSLayoutAttributeHeight multiplier:1 constant:3];
 
         [self.progressViewConstraints addObjectsFromArray:
                 @[
                         progressViewLeftConstraint,
                         progressViewTopConstraint,
+                        progressViewHeightConstraint,
                         progressViewWidthConstraint
                 ]
         ];
@@ -611,7 +618,8 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                                                 toItem:self.bottomLayoutGuide
                                              attribute:NSLayoutAttributeTop multiplier:1 constant:0];
 
-        self.browserViewBottomConstraint.priority = UILayoutPriorityDefaultHigh;
+        self.browserViewBottomConstraint.priority = UILayoutPriorityRequired;
+        self.browserViewBottomConstraint.identifier = @"browserViewBottomConstraint";
 
         CGSize webViewContentSize = self.webView.scrollView.contentSize;
 
@@ -622,8 +630,10 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                                                 toItem:nil
                                              attribute:NSLayoutAttributeNotAnAttribute multiplier:1 constant:webViewContentSize.height];
 
-        self.browserViewHeightConstraint.priority = UILayoutPriorityDefaultLow;
+        self.browserViewHeightConstraint.priority = UILayoutPriorityDefaultHigh;
+        self.browserViewHeightConstraint.identifier = @"browserViewHeightConstraint";
         //browserViewHeightConstraint.active
+
 
         self.webView.translatesAutoresizingMaskIntoConstraints = NO;
 
@@ -1454,7 +1464,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
         KINSnapshotOperation *firstOperation = [KINSnapshotOperation new];
         firstOperation.workBlock = ^{
             [[NSOperationQueue mainQueue] addOperationWithBlock:^{
-                self.webView.scrollView.contentSize = CGSizeMake(self.webView.bounds.size.width, progress.snapshotHeight ); //* 2
+                self.webView.scrollView.contentSize = CGSizeMake(self.webView.bounds.size.width, progress.snapshotHeight); //* 2
                 self.webView.scrollView.contentOffset = CGPointZero;
                 self.webView.scrollView.scrollEnabled = NO;
                 self.webView.userInteractionEnabled = NO;
@@ -1464,7 +1474,7 @@ static void *KINWebBrowserContext = &KINWebBrowserContext;
                 self.browserCanvas.scrollEnabled = YES;
                 self.browserCanvas.contentOffset = CGPointZero;
                 self.browserCanvas.userInteractionEnabled = NO;
-                // self.browserCanvas.contentSize =  CGSizeMake(progress.initialContentSize .width, progress.snapshotHeight); //
+                self.browserCanvas.contentSize = CGSizeMake(progress.initialContentSize .width, progress.snapshotHeight);
             }];
             [NSThread sleepForTimeInterval:snapshotDelay];
         };
